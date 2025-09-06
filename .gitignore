@@ -11,3 +11,8 @@ data_*/
 **/*.pprof
 **/trace.out
 *.db
+
+
+# Added by cargo
+
+/target
