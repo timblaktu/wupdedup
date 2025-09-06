@@ -10,6 +10,7 @@ use walkdir::{DirEntry, WalkDir};
 
 use crate::config::LocalConfig;
 use crate::content;
+use crate::db::FileMetadata;
 use crate::storage::{StorageStrategy, StorageStrategyContext};
 
 pub struct LocalStrategy {
@@ -96,7 +97,16 @@ impl StorageStrategy for LocalStrategy {
             for info in &file_infos {
                 let key = info.path.to_string_lossy();
                 let value = serde_json::to_vec(&info)?;
-                bucket.put(&key, &value)?;
+                
+                // Create metadata for indexing
+                let metadata = FileMetadata {
+                    hash: Some(info.hash.clone()),
+                    size: Some(info.size),
+                    file_type: Some(info.file_type.clone()),
+                };
+                
+                // Use indexed put operation
+                bucket.put_with_indexes(&key, &value, Some(metadata))?;
             }
         }
         

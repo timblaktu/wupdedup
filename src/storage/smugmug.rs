@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
 use crate::config::SmugMugConfig;
+use crate::db::FileMetadata;
 use crate::storage::{StorageStrategy, StorageStrategyContext};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -180,8 +181,15 @@ impl StorageStrategy for SmugMugStrategy {
                         modified: image.last_updated.clone().unwrap_or_else(|| "unknown".to_string()),
                     };
                     
+                    // Create metadata for indexing
+                    let metadata = FileMetadata {
+                        hash: Some(file_info.hash.clone()),
+                        size: Some(file_info.size),
+                        file_type: Some(file_info.mime_type.clone()),
+                    };
+                    
                     let serialized = serde_json::to_vec(&file_info)?;
-                    bucket.put(&key, &serialized)?;
+                    bucket.put_with_indexes(&key, &serialized, Some(metadata))?;
                 }
             }
             

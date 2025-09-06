@@ -148,53 +148,49 @@ async fn run_dedupe(config: &config::Config, show_only: bool) -> Result<()> {
     
     // Get all buckets from the database directly
     // For now, we'll check known bucket names (local, smugmug)
-    let bucket_names = vec!["local", "smugmug", "test", "bucket1", "bucket2"];
+    let bucket_names = vec!["local", "smugmug"];
     
-    // Collect all files from all buckets
-    let mut all_files: std::collections::HashMap<String, Vec<(String, String)>> = std::collections::HashMap::new();
-    
-    for bucket_name in &bucket_names {
-        let bucket = db.bucket(bucket_name)?;
-        let items = bucket.all()?;
-        
-        for (key, value) in items {
-            // Deserialize the FileInfo
-            if let Ok(file_info) = serde_json::from_slice::<serde_json::Value>(&value) {
-                if let Some(hash) = file_info.get("hash").and_then(|h| h.as_str()) {
-                    all_files.entry(hash.to_string())
-                        .or_insert_with(Vec::new)
-                        .push((bucket_name.to_string(), key));
-                }
-            }
-        }
-    }
-    
-    // Find and report duplicates
-    let mut duplicate_groups = 0;
-    let mut duplicate_files = 0;
-    let mut space_wasted: u64 = 0;
+    let mut total_duplicate_groups = 0;
+    let mut total_duplicate_files = 0;
+    let mut total_space_wasted: u64 = 0;
+    let mut any_duplicates_found = false;
     
     println!("\n=== Duplicate Files Report ===");
     
-    for (hash, files) in &all_files {
-        if files.len() > 1 {
-            duplicate_groups += 1;
-            duplicate_files += files.len() - 1; // Count extras only
+    for bucket_name in &bucket_names {
+        let bucket = db.bucket(bucket_name)?;
+        
+        // Skip if bucket has no entries
+        if bucket.count()? == 0 {
+            continue;
+        }
+        
+        // Use the indexed find_duplicates method
+        let duplicates = bucket.find_duplicates()?;
+        
+        if duplicates.is_empty() {
+            continue;
+        }
+        
+        any_duplicates_found = true;
+        println!("\n--- Storage: {} ---", bucket_name);
+        
+        for (hash, files) in &duplicates {
+            total_duplicate_groups += 1;
+            total_duplicate_files += files.len() - 1; // Count extras only
             
-            println!("\nHash: {}", &hash[..16]); // Show first 16 chars of hash
+            println!("\nHash: {}", &hash[..16.min(hash.len())]); // Show first 16 chars of hash
             println!("Files ({}):", files.len());
             
-            for (storage, path) in files {
-                println!("  [{:8}] {}", storage, path);
+            for (idx, file_key) in files.iter().enumerate() {
+                println!("  {}", file_key);
                 
                 // Get file size for space calculation
-                if let Ok(bucket) = db.bucket(storage) {
-                    if let Ok(Some(value)) = bucket.get(path) {
+                if idx > 0 {  // Count all but the first as wasted space
+                    if let Ok(Some(value)) = bucket.get(file_key) {
                         if let Ok(file_info) = serde_json::from_slice::<serde_json::Value>(&value) {
                             if let Some(size) = file_info.get("size").and_then(|s| s.as_u64()) {
-                                if files.iter().position(|(s, p)| s == storage && p == path).unwrap() > 0 {
-                                    space_wasted += size;
-                                }
+                                total_space_wasted += size;
                             }
                         }
                     }
@@ -203,12 +199,16 @@ async fn run_dedupe(config: &config::Config, show_only: bool) -> Result<()> {
         }
     }
     
-    println!("\n=== Summary ===");
-    println!("Total duplicate groups: {}", duplicate_groups);
-    println!("Total duplicate files:  {}", duplicate_files);
-    println!("Space wasted:          {} MB", space_wasted / (1024 * 1024));
+    if !any_duplicates_found {
+        println!("\nNo duplicate files found.");
+    }
     
-    if !show_only && duplicate_groups > 0 {
+    println!("\n=== Summary ===");
+    println!("Total duplicate groups: {}", total_duplicate_groups);
+    println!("Total duplicate files:  {}", total_duplicate_files);
+    println!("Space wasted:          {} MB", total_space_wasted / (1024 * 1024));
+    
+    if !show_only && total_duplicate_groups > 0 {
         println!("\nNote: Use --show-only flag to preview duplicates without making changes.");
         println!("Automatic deduplication not yet implemented.");
     }
