@@ -146,15 +146,71 @@ async fn run_dedupe(config: &config::Config, show_only: bool) -> Result<()> {
     // Initialize database
     let db = db::DB::init(&config.db_file)?;
     
-    // TODO: Implement deduplication logic
-    // - Read all file hashes from database
-    // - Group files by hash
-    // - Report or handle duplicates
+    // Get all buckets from the database directly
+    // For now, we'll check known bucket names (local, smugmug)
+    let bucket_names = vec!["local", "smugmug", "test", "bucket1", "bucket2"];
     
-    if show_only {
-        info!("Showing duplicates only (no changes will be made)");
-    } else {
-        info!("Would process duplicates (not yet implemented)");
+    // Collect all files from all buckets
+    let mut all_files: std::collections::HashMap<String, Vec<(String, String)>> = std::collections::HashMap::new();
+    
+    for bucket_name in &bucket_names {
+        let bucket = db.bucket(bucket_name)?;
+        let items = bucket.all()?;
+        
+        for (key, value) in items {
+            // Deserialize the FileInfo
+            if let Ok(file_info) = serde_json::from_slice::<serde_json::Value>(&value) {
+                if let Some(hash) = file_info.get("hash").and_then(|h| h.as_str()) {
+                    all_files.entry(hash.to_string())
+                        .or_insert_with(Vec::new)
+                        .push((bucket_name.to_string(), key));
+                }
+            }
+        }
+    }
+    
+    // Find and report duplicates
+    let mut duplicate_groups = 0;
+    let mut duplicate_files = 0;
+    let mut space_wasted: u64 = 0;
+    
+    println!("\n=== Duplicate Files Report ===");
+    
+    for (hash, files) in &all_files {
+        if files.len() > 1 {
+            duplicate_groups += 1;
+            duplicate_files += files.len() - 1; // Count extras only
+            
+            println!("\nHash: {}", &hash[..16]); // Show first 16 chars of hash
+            println!("Files ({}):", files.len());
+            
+            for (storage, path) in files {
+                println!("  [{:8}] {}", storage, path);
+                
+                // Get file size for space calculation
+                if let Ok(bucket) = db.bucket(storage) {
+                    if let Ok(Some(value)) = bucket.get(path) {
+                        if let Ok(file_info) = serde_json::from_slice::<serde_json::Value>(&value) {
+                            if let Some(size) = file_info.get("size").and_then(|s| s.as_u64()) {
+                                if files.iter().position(|(s, p)| s == storage && p == path).unwrap() > 0 {
+                                    space_wasted += size;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    println!("\n=== Summary ===");
+    println!("Total duplicate groups: {}", duplicate_groups);
+    println!("Total duplicate files:  {}", duplicate_files);
+    println!("Space wasted:          {} MB", space_wasted / (1024 * 1024));
+    
+    if !show_only && duplicate_groups > 0 {
+        println!("\nNote: Use --show-only flag to preview duplicates without making changes.");
+        println!("Automatic deduplication not yet implemented.");
     }
     
     db.close()?;
@@ -168,13 +224,15 @@ async fn show_stats(config: &config::Config) -> Result<()> {
     // Initialize database
     let db = db::DB::init(&config.db_file)?;
     
-    // Load storage contexts to get bucket names
-    let contexts = storage::load_storage_strategy_contexts(config)?;
+    // Get all buckets from the database directly
+    let bucket_names = vec!["local", "smugmug", "test", "bucket1", "bucket2"];
     
-    for context in &contexts {
-        let bucket = db.bucket(&context.name)?;
+    for bucket_name in &bucket_names {
+        let bucket = db.bucket(bucket_name)?;
         let count = bucket.count()?;
-        info!("{} storage: {} files indexed", context.name, count);
+        if count > 0 {
+            info!("{} storage: {} files indexed", bucket_name, count);
+        }
     }
     
     db.close()?;

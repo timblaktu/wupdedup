@@ -127,6 +127,21 @@ impl Bucket {
         let table = read_txn.open_table(table_def)?;
         Ok(table.len()? as usize)
     }
+    
+    #[allow(dead_code)]
+    pub fn all(&self) -> Result<Vec<(String, Vec<u8>)>> {
+        let table_def: TableDefinition<&str, &[u8]> = TableDefinition::new(&self.name);
+        let read_txn = self.database.begin_read()?;
+        let table = read_txn.open_table(table_def)?;
+        
+        let mut results = Vec::new();
+        for item in table.iter()? {
+            let (key, value) = item?;
+            results.push((key.value().to_string(), value.value().to_vec()));
+        }
+        
+        Ok(results)
+    }
 }
 
 // Scanner trait for iterating over database entries
