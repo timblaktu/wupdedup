@@ -289,3 +289,203 @@ fn test_dedupe_finds_identical_files() -> Result<()> {
     
     Ok(())
 }
+
+#[test]
+fn test_dedupe_delete_strategy() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let test_dir = temp_dir.path().join("test_files");
+    fs::create_dir_all(&test_dir)?;
+    
+    // Create duplicate files (file1 will be kept as it sorts first alphabetically)
+    let content = "duplicate content for deletion test";
+    let file1 = test_dir.join("file1.txt");
+    let file2 = test_dir.join("file2.txt");
+    let file3 = test_dir.join("file3.txt");
+    
+    fs::write(&file1, content)?;
+    fs::write(&file2, content)?;
+    fs::write(&file3, content)?;
+    
+    let db_file = temp_dir.path().join("test.db");
+    
+    // Scan
+    let mut scan = Command::cargo_bin("wupdedup-rs")?;
+    scan.arg("--db-file")
+        .arg(db_file.to_str().unwrap())
+        .arg("scan")
+        .arg("--local")
+        .arg(test_dir.to_str().unwrap())
+        .assert()
+        .success();
+    
+    // Dedupe with delete strategy (dry run first)
+    let mut dedupe_dry = Command::cargo_bin("wupdedup-rs")?;
+    dedupe_dry.arg("--db-file")
+        .arg(db_file.to_str().unwrap())
+        .arg("dedupe")
+        .arg("--strategy")
+        .arg("delete")
+        .arg("--dry-run")
+        .arg("--auto")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("DRY RUN MODE"));
+    
+    // Verify all files still exist after dry run
+    assert!(file1.exists());
+    assert!(file2.exists());
+    assert!(file3.exists());
+    
+    // Dedupe with delete strategy (actual)
+    let mut dedupe = Command::cargo_bin("wupdedup-rs")?;
+    dedupe.arg("--db-file")
+        .arg(db_file.to_str().unwrap())
+        .arg("dedupe")
+        .arg("--strategy")
+        .arg("delete")
+        .arg("--auto")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Deduplication Complete"));
+    
+    // Verify first file remains, others deleted
+    assert!(file1.exists(), "Original file should remain");
+    assert!(!file2.exists(), "Duplicate 1 should be deleted");
+    assert!(!file3.exists(), "Duplicate 2 should be deleted");
+    
+    Ok(())
+}
+
+#[test]
+fn test_dedupe_move_strategy() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let test_dir = temp_dir.path().join("test_files");
+    let target_dir = temp_dir.path().join("duplicates");
+    fs::create_dir_all(&test_dir)?;
+    
+    // Create duplicate files (file1 will be kept as it sorts first alphabetically)
+    let content = "duplicate content for move test";
+    let file1 = test_dir.join("file1.txt");
+    let file2 = test_dir.join("file2.txt");
+    
+    fs::write(&file1, content)?;
+    fs::write(&file2, content)?;
+    
+    let db_file = temp_dir.path().join("test.db");
+    
+    // Scan
+    let mut scan = Command::cargo_bin("wupdedup-rs")?;
+    scan.arg("--db-file")
+        .arg(db_file.to_str().unwrap())
+        .arg("scan")
+        .arg("--local")
+        .arg(test_dir.to_str().unwrap())
+        .assert()
+        .success();
+    
+    // Dedupe with move strategy
+    let mut dedupe = Command::cargo_bin("wupdedup-rs")?;
+    dedupe.arg("--db-file")
+        .arg(db_file.to_str().unwrap())
+        .arg("dedupe")
+        .arg("--strategy")
+        .arg("move")
+        .arg("--target-dir")
+        .arg(target_dir.to_str().unwrap())
+        .arg("--auto")
+        .assert()
+        .success();
+    
+    // Verify first file remains, second is moved
+    assert!(file1.exists(), "Original file should remain");
+    assert!(!file2.exists(), "Duplicate should be moved from original location");
+    assert!(target_dir.join("file2.txt").exists(), "Duplicate should be in target directory");
+    
+    Ok(())
+}
+
+#[test]
+fn test_dedupe_archive_strategy() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let test_dir = temp_dir.path().join("test_files");
+    let archive_dir = temp_dir.path().join("archive");
+    fs::create_dir_all(&test_dir)?;
+    
+    // Create duplicate files in subdirectory (file1 will be kept as it sorts first)
+    let subdir = test_dir.join("subdir");
+    fs::create_dir_all(&subdir)?;
+    
+    let content = "duplicate content for archive test";
+    let file1 = subdir.join("file1.dat");
+    let file2 = subdir.join("file2.dat");
+    
+    fs::write(&file1, content)?;
+    fs::write(&file2, content)?;
+    
+    let db_file = temp_dir.path().join("test.db");
+    
+    // Scan
+    let mut scan = Command::cargo_bin("wupdedup-rs")?;
+    scan.arg("--db-file")
+        .arg(db_file.to_str().unwrap())
+        .arg("scan")
+        .arg("--local")
+        .arg(test_dir.to_str().unwrap())
+        .assert()
+        .success();
+    
+    // Dedupe with archive strategy
+    let mut dedupe = Command::cargo_bin("wupdedup-rs")?;
+    dedupe.arg("--db-file")
+        .arg(db_file.to_str().unwrap())
+        .arg("dedupe")
+        .arg("--strategy")
+        .arg("archive")
+        .arg("--target-dir")
+        .arg(archive_dir.to_str().unwrap())
+        .arg("--auto")
+        .assert()
+        .success();
+    
+    // Verify first file remains, second is archived with preserved path structure
+    assert!(file1.exists(), "Original file should remain");
+    assert!(!file2.exists(), "Duplicate should be archived from original location");
+    
+    Ok(())
+}
+
+#[test]
+fn test_dedupe_no_duplicates() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let test_dir = temp_dir.path().join("test_files");
+    fs::create_dir_all(&test_dir)?;
+    
+    // Create unique files
+    fs::write(test_dir.join("unique1.txt"), "unique content 1")?;
+    fs::write(test_dir.join("unique2.txt"), "unique content 2")?;
+    fs::write(test_dir.join("unique3.txt"), "unique content 3")?;
+    
+    let db_file = temp_dir.path().join("test.db");
+    
+    // Scan
+    let mut scan = Command::cargo_bin("wupdedup-rs")?;
+    scan.arg("--db-file")
+        .arg(db_file.to_str().unwrap())
+        .arg("scan")
+        .arg("--local")
+        .arg(test_dir.to_str().unwrap())
+        .assert()
+        .success();
+    
+    // Check dedupe finds no duplicates
+    let mut dedupe = Command::cargo_bin("wupdedup-rs")?;
+    dedupe.arg("--db-file")
+        .arg(db_file.to_str().unwrap())
+        .arg("dedupe")
+        .arg("--show-only")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No duplicate files found"));
+    
+    Ok(())
+}

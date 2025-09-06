@@ -127,10 +127,56 @@ impl StorageStrategy for LocalStrategy {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-struct FileInfo {
-    path: PathBuf,
-    size: u64,
-    file_type: String,
-    hash: String,
-    modified: chrono::DateTime<chrono::Utc>,
+pub struct FileInfo {
+    pub path: PathBuf,
+    pub size: u64,
+    pub file_type: String,
+    pub hash: String,
+    pub modified: chrono::DateTime<chrono::Utc>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    #[test]
+    fn test_file_info_serialization() {
+        let file_info = FileInfo {
+            path: PathBuf::from("/test/path/file.txt"),
+            size: 1024,
+            file_type: "text/plain".to_string(),
+            hash: "abc123def456".to_string(),
+            modified: Utc::now(),
+        };
+
+        // Serialize
+        let serialized = serde_json::to_vec(&file_info).unwrap();
+        
+        // Deserialize
+        let deserialized: FileInfo = serde_json::from_slice(&serialized).unwrap();
+        
+        assert_eq!(deserialized.path, file_info.path);
+        assert_eq!(deserialized.size, file_info.size);
+        assert_eq!(deserialized.file_type, file_info.file_type);
+        assert_eq!(deserialized.hash, file_info.hash);
+    }
+
+    #[test]
+    fn test_file_info_deserialization_from_json() {
+        let json_str = r#"{
+            "path": "/home/user/document.pdf",
+            "size": 2048,
+            "file_type": "application/pdf",
+            "hash": "xyz789abc456",
+            "modified": "2024-01-01T12:00:00Z"
+        }"#;
+
+        let file_info: FileInfo = serde_json::from_str(json_str).unwrap();
+        
+        assert_eq!(file_info.path, PathBuf::from("/home/user/document.pdf"));
+        assert_eq!(file_info.size, 2048);
+        assert_eq!(file_info.file_type, "application/pdf");
+        assert_eq!(file_info.hash, "xyz789abc456");
+    }
 }

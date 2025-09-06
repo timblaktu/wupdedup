@@ -9,7 +9,8 @@ mod storage;
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
+use storage::local::FileInfo;
 
 #[derive(Parser, Debug)]
 #[command(name = "wupdedup-rs")]
@@ -285,19 +286,45 @@ async fn run_dedupe(
                 
                 let duplicates = bucket.find_duplicates()?;
                 
-                for (_hash, files) in duplicates {
-                    // Convert file keys to paths
-                    let paths: Vec<PathBuf> = files.iter()
-                        .map(|f| PathBuf::from(f))
-                        .collect();
+                for (hash, file_keys) in duplicates {
+                    // Get the actual file data from the bucket and extract paths
+                    let mut paths: Vec<PathBuf> = Vec::new();
                     
-                    if let Ok(result) = engine.process_duplicates(&paths) {
-                        total_result.deleted += result.deleted;
-                        total_result.moved += result.moved;
-                        total_result.symlinked += result.symlinked;
-                        total_result.archived += result.archived;
-                        total_result.skipped += result.skipped;
-                        total_result.space_freed += result.space_freed;
+                    for key in &file_keys {
+                        // Get the file data from the bucket
+                        if let Ok(Some(data)) = bucket.get(key) {
+                            // Deserialize FileInfo to get the actual path
+                            match serde_json::from_slice::<FileInfo>(&data) {
+                                Ok(file_info) => {
+                                    // Only process local files that exist
+                                    if file_info.path.exists() {
+                                        paths.push(file_info.path);
+                                    } else {
+                                        warn!("File no longer exists: {:?}", file_info.path);
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!("Failed to deserialize file info for key '{}': {}", key, e);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Only process if we have at least 2 existing files
+                    if paths.len() >= 2 {
+                        // Sort paths to ensure consistent ordering (alphabetically)
+                        paths.sort();
+                        debug!("Processing {} duplicates with hash: {}", paths.len(), hash);
+                        if let Ok(result) = engine.process_duplicates(&paths) {
+                            total_result.deleted += result.deleted;
+                            total_result.moved += result.moved;
+                            total_result.symlinked += result.symlinked;
+                            total_result.archived += result.archived;
+                            total_result.skipped += result.skipped;
+                            total_result.space_freed += result.space_freed;
+                        }
+                    } else if paths.len() == 1 {
+                        debug!("Only one file remains for hash {}, skipping", hash);
                     }
                 }
             }

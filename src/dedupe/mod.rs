@@ -36,6 +36,14 @@ impl DedupeEngine {
         let original = &files[0];
         let duplicates = &files[1..];
         
+        // Verify original file exists
+        if !original.exists() {
+            warn!("Original file not found: {}, skipping group", original.display());
+            let mut result = DedupeResult::default();
+            result.skipped = files.len();
+            return Ok(result);
+        }
+        
         info!("Processing {} duplicates of {}", duplicates.len(), original.display());
         
         let mut result = DedupeResult::default();
@@ -47,22 +55,43 @@ impl DedupeEngine {
                 continue;
             }
             
+            // Get file size before processing for space freed calculation
+            let file_size = fs::metadata(duplicate)
+                .map(|m| m.len())
+                .unwrap_or(0);
+            
             if !self.auto_confirm && !self.dry_run {
                 // In real implementation, would prompt user here
                 debug!("Would prompt for confirmation to dedupe: {}", duplicate.display());
             }
             
-            match self.apply_strategy(original, duplicate)? {
-                DedupeAction::Deleted => result.deleted += 1,
-                DedupeAction::Moved => result.moved += 1,
-                DedupeAction::Symlinked => result.symlinked += 1,
-                DedupeAction::Archived => result.archived += 1,
-                DedupeAction::Skipped => result.skipped += 1,
+            match self.apply_strategy(original, duplicate) {
+                Ok(action) => {
+                    match action {
+                        DedupeAction::Deleted => {
+                            result.deleted += 1;
+                            result.space_freed += file_size;
+                        }
+                        DedupeAction::Moved => {
+                            result.moved += 1;
+                            // Moving doesn't free space, just relocates it
+                        }
+                        DedupeAction::Symlinked => {
+                            result.symlinked += 1;
+                            result.space_freed += file_size;
+                        }
+                        DedupeAction::Archived => {
+                            result.archived += 1;
+                            // Archiving doesn't free space, just relocates it
+                        }
+                        DedupeAction::Skipped => result.skipped += 1,
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to process duplicate {}: {}", duplicate.display(), e);
+                    result.skipped += 1;
+                }
             }
-            
-            result.space_freed += fs::metadata(duplicate)
-                .map(|m| m.len())
-                .unwrap_or(0);
         }
         
         Ok(result)
@@ -231,6 +260,93 @@ mod tests {
         assert!(file1.exists());
         assert!(file2.exists());
         assert_eq!(result.deleted, 1); // But counted as would be deleted
+    }
+    
+    #[test]
+    fn test_dedupe_engine_delete() {
+        let engine = DedupeEngine::new(DedupeStrategy::Delete, false, true);
+        
+        let temp_dir = TempDir::new().unwrap();
+        let file1 = temp_dir.path().join("file1.txt");
+        let file2 = temp_dir.path().join("file2.txt");
+        let file3 = temp_dir.path().join("file3.txt");
+        
+        fs::write(&file1, "duplicate content").unwrap();
+        fs::write(&file2, "duplicate content").unwrap();
+        fs::write(&file3, "duplicate content").unwrap();
+        
+        let files = vec![file1.clone(), file2.clone(), file3.clone()];
+        let result = engine.process_duplicates(&files).unwrap();
+        
+        // First file should remain, others deleted
+        assert!(file1.exists());
+        assert!(!file2.exists());
+        assert!(!file3.exists());
+        assert_eq!(result.deleted, 2);
+        assert_eq!(result.total_processed(), 2);
+        assert_eq!(result.space_freed, 34); // 2 * 17 bytes
+    }
+    
+    #[test]
+    fn test_dedupe_engine_move() {
+        let engine_dir = TempDir::new().unwrap();
+        let target_dir = engine_dir.path().join("duplicates");
+        let engine = DedupeEngine::new(DedupeStrategy::Move(target_dir.clone()), false, true);
+        
+        let temp_dir = TempDir::new().unwrap();
+        let file1 = temp_dir.path().join("file1.txt");
+        let file2 = temp_dir.path().join("file2.txt");
+        
+        fs::write(&file1, "content to move").unwrap();
+        fs::write(&file2, "content to move").unwrap();
+        
+        let files = vec![file1.clone(), file2.clone()];
+        let result = engine.process_duplicates(&files).unwrap();
+        
+        // First file should remain, second moved
+        assert!(file1.exists());
+        assert!(!file2.exists());
+        assert!(target_dir.join("file2.txt").exists());
+        assert_eq!(result.moved, 1);
+        assert_eq!(result.space_freed, 0); // Moving doesn't free space
+    }
+    
+    #[test]
+    fn test_dedupe_engine_missing_files() {
+        let engine = DedupeEngine::new(DedupeStrategy::Delete, false, true);
+        
+        let temp_dir = TempDir::new().unwrap();
+        let file1 = temp_dir.path().join("exists.txt");
+        let file2 = temp_dir.path().join("missing.txt");
+        
+        fs::write(&file1, "content").unwrap();
+        // file2 doesn't exist
+        
+        let files = vec![file1.clone(), file2.clone()];
+        let result = engine.process_duplicates(&files).unwrap();
+        
+        assert!(file1.exists());
+        assert_eq!(result.deleted, 0);
+        assert_eq!(result.skipped, 1);
+    }
+    
+    #[test]
+    fn test_dedupe_engine_original_missing() {
+        let engine = DedupeEngine::new(DedupeStrategy::Delete, false, true);
+        
+        let temp_dir = TempDir::new().unwrap();
+        let file1 = temp_dir.path().join("missing.txt");
+        let file2 = temp_dir.path().join("exists.txt");
+        
+        fs::write(&file2, "content").unwrap();
+        // file1 (original) doesn't exist
+        
+        let files = vec![file1, file2.clone()];
+        let result = engine.process_duplicates(&files).unwrap();
+        
+        assert!(file2.exists()); // Should not be deleted
+        assert_eq!(result.deleted, 0);
+        assert_eq!(result.skipped, 2); // Both files skipped
     }
     
     #[test]
