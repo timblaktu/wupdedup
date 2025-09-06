@@ -255,3 +255,128 @@ fn prop_scan_reproducible() {
         assert_eq!(context1.node_count, context2.node_count);
     });
 }
+
+// Property: Hash uniqueness for different files
+proptest! {
+    #[test]
+    fn prop_unique_files_unique_hashes(
+        files in prop::collection::vec(
+            (
+                "[a-z]{1,10}",  // filename
+                prop::collection::vec(any::<u8>(), 1..100)  // content
+            ),
+            2..20
+        )
+    ) {
+        use blake3::Hasher;
+        use std::collections::HashSet;
+        
+        // Create unique file contents
+        let mut unique_contents = HashSet::new();
+        for (_, content) in &files {
+            unique_contents.insert(content.clone());
+        }
+        
+        // Hash all unique contents
+        let mut hashes = HashSet::new();
+        for content in unique_contents.iter() {
+            let mut hasher = Hasher::new();
+            hasher.update(content);
+            let hash = hasher.finalize().to_hex().to_string();
+            hashes.insert(hash);
+        }
+        
+        // Number of unique hashes should equal number of unique contents
+        prop_assert_eq!(hashes.len(), unique_contents.len());
+    }
+}
+
+// Property: Database operations are atomic
+proptest! {
+    #[test]
+    fn prop_db_atomicity(
+        operations in prop::collection::vec(
+            (
+                prop::bool::ANY,
+                "[a-z]{1,20}",
+                prop::collection::vec(any::<u8>(), 0..100)
+            ),
+            1..30
+        )
+    ) {
+        use std::collections::HashSet;
+        
+        let temp_dir = tempdir().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db = wupdedup_rs::db::DB::init(db_path.to_str().unwrap()).unwrap();
+        let bucket = db.bucket("test").unwrap();
+        
+        let mut expected_keys = HashSet::new();
+        
+        for (is_put, key, value) in operations {
+            if is_put {
+                bucket.put(&key, &value).unwrap();
+                expected_keys.insert(key.clone());
+            } else {
+                bucket.delete(&key).unwrap();
+                expected_keys.remove(&key);
+            }
+            
+            // Verify consistency after each operation
+            for expected_key in &expected_keys {
+                prop_assert!(bucket.exists(expected_key).unwrap());
+            }
+        }
+        
+        prop_assert_eq!(bucket.count().unwrap(), expected_keys.len());
+    }
+}
+
+// Property: Path normalization is consistent
+proptest! {
+    #[test]
+    fn prop_path_normalization(
+        components in prop::collection::vec(
+            prop::string::string_regex("[a-zA-Z0-9._-]+").unwrap(),
+            1..5
+        )
+    ) {
+        use std::path::PathBuf;
+        
+        // Build path in different ways
+        let path1 = components.iter()
+            .fold(PathBuf::new(), |p, c| p.join(c));
+        
+        let path2 = PathBuf::from(components.join("/"));
+        
+        // On Unix systems, these should be equivalent
+        #[cfg(unix)]
+        prop_assert_eq!(path1.to_string_lossy(), path2.to_string_lossy());
+    }
+}
+
+// Property: File operations preserve content
+proptest! {
+    #[test]
+    fn prop_file_content_preservation(
+        content in prop::collection::vec(any::<u8>(), 0..10000),
+        filename in "[a-z]{1,20}\\.[a-z]{2,4}"
+    ) {
+        let temp_dir = tempdir().unwrap();
+        let file_path = temp_dir.path().join(&filename);
+        
+        // Write content
+        std::fs::write(&file_path, &content).unwrap();
+        
+        // Read back
+        let read_content = std::fs::read(&file_path).unwrap();
+        
+        // Content should be identical
+        prop_assert_eq!(&content, &read_content);
+        
+        // Metadata should be consistent
+        let metadata = std::fs::metadata(&file_path).unwrap();
+        prop_assert_eq!(metadata.len() as usize, content.len());
+        prop_assert!(metadata.is_file());
+    }
+}

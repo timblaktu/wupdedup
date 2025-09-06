@@ -318,3 +318,137 @@ async fn test_scan_handles_io_errors_gracefully() -> Result<()> {
     
     Ok(())
 }
+
+#[rstest]
+#[tokio::test]
+async fn test_scan_with_permission_denied_files() -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    
+    let fixture = TestFixture::new()?.with_db()?;
+    
+    // Create a file with restricted permissions
+    let restricted_file = fixture.create_file("restricted.txt", b"secret")?;
+    let mut perms = fs::metadata(&restricted_file)?.permissions();
+    perms.set_mode(0o000); // No permissions
+    fs::set_permissions(&restricted_file, perms)?;
+    
+    // Create normal files
+    fixture.create_files(&[
+        ("normal1.txt", b"content1"),
+        ("normal2.txt", b"content2"),
+    ])?;
+    
+    let strategy = Arc::new(LocalStrategy::new(fixture.get_config().local.unwrap()));
+    let mut context = StorageStrategyContext::new(strategy, "test".to_string());
+    
+    let bucket = fixture.db.as_ref().unwrap().bucket("test")?;
+    context.set_bucket(bucket);
+    
+    // Should complete even with permission denied files
+    context.scan_tree().await?;
+    
+    // Should have processed the accessible files
+    assert!(context.file_count >= 2);
+    
+    // Restore permissions for cleanup
+    let mut perms = fs::metadata(&restricted_file)?.permissions();
+    perms.set_mode(0o644);
+    fs::set_permissions(&restricted_file, perms)?;
+    
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+async fn test_scan_with_symlinks() -> Result<()> {
+    use std::os::unix::fs;
+    
+    let fixture = TestFixture::new()?.with_db()?;
+    
+    // Create regular files
+    fixture.create_file("original.txt", b"original content")?;
+    fixture.create_file("dir/nested.txt", b"nested content")?;
+    
+    // Create symlinks
+    let original_path = fixture.root_path.join("original.txt");
+    let link_path = fixture.root_path.join("link_to_original.txt");
+    fs::symlink(&original_path, &link_path)?;
+    
+    // Create directory symlink
+    let dir_path = fixture.root_path.join("dir");
+    let dir_link_path = fixture.root_path.join("link_to_dir");
+    fs::symlink(&dir_path, &dir_link_path)?;
+    
+    let strategy = Arc::new(LocalStrategy::new(fixture.get_config().local.unwrap()));
+    let mut context = StorageStrategyContext::new(strategy, "test".to_string());
+    
+    let bucket = fixture.db.as_ref().unwrap().bucket("test")?;
+    context.set_bucket(bucket);
+    
+    context.scan_tree().await?;
+    
+    // Should handle symlinks appropriately
+    assert!(context.file_count > 0);
+    
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+async fn test_scan_with_zero_byte_files() -> Result<()> {
+    let fixture = TestFixture::new()?.with_db()?;
+    
+    // Create zero-byte files
+    fixture.create_file("empty1.txt", b"")?;
+    fixture.create_file("empty2.txt", b"")?;
+    fixture.create_file("dir/empty3.txt", b"")?;
+    
+    // Create normal files
+    fixture.create_file("normal.txt", b"content")?;
+    
+    let strategy = Arc::new(LocalStrategy::new(fixture.get_config().local.unwrap()));
+    let mut context = StorageStrategyContext::new(strategy, "test".to_string());
+    
+    let bucket = fixture.db.as_ref().unwrap().bucket("test")?;
+    context.set_bucket(bucket);
+    
+    context.scan_tree().await?;
+    
+    assert_eq!(context.file_count, 4);
+    
+    // All files should be in the database, including empty ones
+    assert!(fixture.verify_in_db("empty1.txt")?);
+    assert!(fixture.verify_in_db("empty2.txt")?);
+    assert!(fixture.verify_in_db("dir/empty3.txt")?);
+    assert!(fixture.verify_in_db("normal.txt")?);
+    
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+async fn test_rescan_idempotency() -> Result<()> {
+    let fixture = TestFixture::new()?.with_db()?;
+    fixture.create_standard_layout()?;
+    
+    let strategy = Arc::new(LocalStrategy::new(fixture.get_config().local.unwrap()));
+    
+    // First scan
+    let mut context1 = StorageStrategyContext::new(strategy.clone(), "test".to_string());
+    let bucket1 = fixture.db.as_ref().unwrap().bucket("test")?;
+    context1.set_bucket(bucket1);
+    context1.scan_tree().await?;
+    let first_count = context1.file_count;
+    
+    // Second scan - should be idempotent
+    let mut context2 = StorageStrategyContext::new(strategy, "test".to_string());
+    let bucket2 = fixture.db.as_ref().unwrap().bucket("test")?;
+    context2.set_bucket(bucket2);
+    context2.scan_tree().await?;
+    let second_count = context2.file_count;
+    
+    assert_eq!(first_count, second_count);
+    assert_eq!(fixture.db.as_ref().unwrap().bucket("test")?.count()?, 7); // Should not duplicate entries
+    
+    Ok(())
+}

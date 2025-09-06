@@ -83,3 +83,119 @@ impl Profiler {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::thread;
+    use std::time::Duration;
+
+    #[test]
+    fn test_profiler_disabled() {
+        let config = ProfileConfig {
+            enabled: false,
+            mode: None,
+        };
+        
+        let mut profiler = Profiler::new(config);
+        assert!(profiler.start().is_ok());
+        assert!(profiler.stop().is_ok());
+        profiler.mark("test_mark");
+        // Should complete without errors when disabled
+    }
+
+    #[test]
+    fn test_profiler_basic_timing() {
+        let config = ProfileConfig {
+            enabled: true,
+            mode: None,
+        };
+        
+        let mut profiler = Profiler::new(config);
+        assert!(profiler.start().is_ok());
+        
+        // Simulate some work
+        thread::sleep(Duration::from_millis(10));
+        
+        profiler.mark("checkpoint");
+        assert!(profiler.stop().is_ok());
+    }
+
+    #[test]
+    fn test_profiler_with_cpu_mode() {
+        let config = ProfileConfig {
+            enabled: true,
+            mode: Some("cpu".to_string()),
+        };
+        
+        let mut profiler = Profiler::new(config);
+        assert!(profiler.start().is_ok());
+        assert!(profiler.stop().is_ok());
+    }
+
+    #[test]
+    fn test_profiler_with_memory_mode() {
+        let config = ProfileConfig {
+            enabled: true,
+            mode: Some("memory".to_string()),
+        };
+        
+        let mut profiler = Profiler::new(config);
+        assert!(profiler.start().is_ok());
+        assert!(profiler.stop().is_ok());
+    }
+
+    #[test]
+    fn test_profiler_with_trace_mode() {
+        let config = ProfileConfig {
+            enabled: true,
+            mode: Some("trace".to_string()),
+        };
+        
+        let mut profiler = Profiler::new(config);
+        assert!(profiler.start().is_ok());
+        assert!(profiler.stop().is_ok());
+    }
+
+    #[test]
+    fn test_profiler_elapsed_time() {
+        let config = ProfileConfig {
+            enabled: true,
+            mode: None,
+        };
+        
+        let mut profiler = Profiler::new(config);
+        profiler.start().unwrap();
+        
+        thread::sleep(Duration::from_millis(50));
+        
+        // Check that start_time is set
+        assert!(profiler.start_time.is_some());
+        
+        let elapsed = profiler.start_time.unwrap().elapsed();
+        assert!(elapsed >= Duration::from_millis(50));
+        
+        profiler.stop().unwrap();
+    }
+
+    #[test]
+    fn test_profiler_multiple_marks() {
+        let config = ProfileConfig {
+            enabled: true,
+            mode: None,
+        };
+        
+        let mut profiler = Profiler::new(config);
+        profiler.start().unwrap();
+        
+        profiler.mark("start_processing");
+        thread::sleep(Duration::from_millis(10));
+        
+        profiler.mark("mid_processing");
+        thread::sleep(Duration::from_millis(10));
+        
+        profiler.mark("end_processing");
+        
+        profiler.stop().unwrap();
+    }
+}
