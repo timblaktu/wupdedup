@@ -5,9 +5,10 @@ A high-performance file deduplication and multicloud storage management tool wri
 ## Features
 
 - **Fast Scanning**: Parallel file scanning with Blake3 hashing for superior performance
-- **Deduplication Detection**: Identify duplicate files across local and cloud storage
+- **Automatic Deduplication**: Remove, move, archive, or symlink duplicate files with multiple strategies
 - **Multiple Storage Backends**: Support for local filesystem and SmugMug (more coming soon)
 - **Efficient Database**: Uses embedded redb for fast, reliable metadata storage
+- **Safe Operations**: Dry-run mode, file existence validation, and comprehensive error handling
 - **Cross-platform**: Works on Linux, macOS, and Windows
 
 ## Installation
@@ -38,15 +39,29 @@ wupdedup-rs --db-file custom.db scan --local /path/to/directory
 wupdedup-rs --log-level debug scan --local /path/to/directory
 ```
 
-### Find duplicates
+### Find and process duplicates
 
 ```bash
-# Show duplicate files (read-only)
+# Show duplicate files without taking action
 wupdedup-rs dedupe --show-only
 
-# Find duplicates after scanning
-wupdedup-rs scan --local /photos
-wupdedup-rs dedupe --show-only
+# Delete duplicates (keeps first file alphabetically)
+wupdedup-rs dedupe --strategy delete --auto
+
+# Move duplicates to a directory
+wupdedup-rs dedupe --strategy move --target-dir /path/to/duplicates --auto
+
+# Archive duplicates (preserves directory structure)
+wupdedup-rs dedupe --strategy archive --target-dir /path/to/archive --auto
+
+# Create symlinks to original (Unix only)
+wupdedup-rs dedupe --strategy symlink --auto
+
+# Dry run - preview changes without applying them
+wupdedup-rs dedupe --strategy delete --dry-run --auto
+
+# Interactive mode (prompts for each duplicate)
+wupdedup-rs dedupe --strategy delete
 ```
 
 ### View statistics
@@ -149,9 +164,11 @@ wupdedup/
 ├── src/
 │   ├── main.rs           # CLI entry point
 │   ├── config/           # Configuration management
-│   ├── db/               # Database abstraction
+│   ├── db/               # Database abstraction with indexing
+│   ├── dedupe/           # Deduplication engine
+│   │   └── mod.rs        # Strategies: delete, move, archive, symlink
 │   ├── storage/          # Storage strategy implementations
-│   │   ├── local.rs      # Local filesystem scanner
+│   │   ├── local.rs      # Local filesystem scanner with FileInfo
 │   │   └── smugmug.rs    # SmugMug API integration
 │   ├── content.rs        # MIME type detection
 │   ├── logging.rs        # Structured logging setup
