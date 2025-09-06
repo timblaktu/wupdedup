@@ -40,12 +40,16 @@ fn test_scan_command() -> Result<()> {
     fs::write(test_dir.join("file1.txt"), "content1")?;
     fs::write(test_dir.join("file2.txt"), "content2")?;
     
+    // Create a test database
+    let db_file = temp_dir.path().join("test.db");
+    
     let mut cmd = Command::cargo_bin("wupdedup-rs")?;
-    cmd.arg("scan")
+    cmd.arg("--db-file")
+        .arg(db_file.to_str().unwrap())
+        .arg("scan")
         .arg("--local")
         .arg(test_dir.to_str().unwrap())
         .assert()
-        .success()
         .success();
     
     Ok(())
@@ -55,12 +59,16 @@ fn test_scan_command() -> Result<()> {
 fn test_scan_empty_directory() -> Result<()> {
     let temp_dir = TempDir::new()?;
     
+    // Create a test database
+    let db_file = temp_dir.path().join("test.db");
+    
     let mut cmd = Command::cargo_bin("wupdedup-rs")?;
-    cmd.arg("scan")
+    cmd.arg("--db-file")
+        .arg(db_file.to_str().unwrap())
+        .arg("scan")
         .arg("--local")
         .arg(temp_dir.path().to_str().unwrap())
         .assert()
-        .success()
         .success();
     
     Ok(())
@@ -150,12 +158,16 @@ fn test_scan_with_subdirectories() -> Result<()> {
     fs::write(test_dir.join("root.txt"), "root content")?;
     fs::write(sub_dir.join("sub.txt"), "sub content")?;
     
+    // Create a test database
+    let db_file = temp_dir.path().join("test.db");
+    
     let mut cmd = Command::cargo_bin("wupdedup-rs")?;
-    cmd.arg("scan")
+    cmd.arg("--db-file")
+        .arg(db_file.to_str().unwrap())
+        .arg("scan")
         .arg("--local")
         .arg(test_dir.to_str().unwrap())
         .assert()
-        .success()
         .success();
     
     Ok(())
@@ -208,8 +220,13 @@ fn test_multiple_scans_are_idempotent() -> Result<()> {
 fn test_log_level_argument() -> Result<()> {
     let temp_dir = TempDir::new()?;
     
+    // Create a test database
+    let db_file = temp_dir.path().join("test.db");
+    
     let mut cmd = Command::cargo_bin("wupdedup-rs")?;
-    cmd.arg("--log-level")
+    cmd.arg("--db-file")
+        .arg(db_file.to_str().unwrap())
+        .arg("--log-level")
         .arg("debug")
         .arg("scan")
         .arg("--local")
