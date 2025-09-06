@@ -1,12 +1,14 @@
 mod config;
 mod content;
 mod db;
+mod dedupe;
 mod logging;
 mod profiler;
 mod storage;
 
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
+use std::path::PathBuf;
 use tracing::{debug, error, info};
 
 #[derive(Parser, Debug)]
@@ -41,15 +43,43 @@ enum Commands {
         smugmug: bool,
     },
     
-    /// Find duplicate files
+    /// Find and optionally remove duplicate files
     Dedupe {
-        /// Show duplicates only
+        /// Show duplicates only (no action taken)
         #[arg(long)]
         show_only: bool,
+        
+        /// Deduplication strategy: delete, move, symlink, or archive
+        #[arg(long, value_enum)]
+        strategy: Option<Strategy>,
+        
+        /// Target directory for move/archive strategies
+        #[arg(long)]
+        target_dir: Option<String>,
+        
+        /// Automatically confirm all actions
+        #[arg(long)]
+        auto: bool,
+        
+        /// Perform a dry run (preview changes without applying)
+        #[arg(long)]
+        dry_run: bool,
     },
     
     /// Show statistics about stored files
     Stats,
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+enum Strategy {
+    /// Delete duplicate files (keep the first occurrence)
+    Delete,
+    /// Move duplicates to a target directory
+    Move,
+    /// Replace duplicates with symlinks (Unix only)
+    Symlink,
+    /// Archive duplicates preserving directory structure
+    Archive,
 }
 
 #[tokio::main]
@@ -87,8 +117,8 @@ async fn main() -> Result<()> {
                 
                 run_scan(&config).await?;
             }
-            Commands::Dedupe { show_only } => {
-                run_dedupe(&config, show_only).await?;
+            Commands::Dedupe { show_only, strategy, target_dir, auto, dry_run } => {
+                run_dedupe(&config, show_only, strategy, target_dir, auto, dry_run).await?;
             }
             Commands::Stats => {
                 show_stats(&config).await?;
@@ -140,7 +170,14 @@ async fn run_scan(config: &config::Config) -> Result<()> {
     Ok(())
 }
 
-async fn run_dedupe(config: &config::Config, show_only: bool) -> Result<()> {
+async fn run_dedupe(
+    config: &config::Config, 
+    show_only: bool,
+    strategy: Option<Strategy>,
+    target_dir: Option<String>,
+    auto: bool,
+    dry_run: bool,
+) -> Result<()> {
     info!("Starting deduplication analysis");
     
     // Initialize database
@@ -208,9 +245,70 @@ async fn run_dedupe(config: &config::Config, show_only: bool) -> Result<()> {
     println!("Total duplicate files:  {}", total_duplicate_files);
     println!("Space wasted:          {} MB", total_space_wasted / (1024 * 1024));
     
+    // Apply deduplication if requested
     if !show_only && total_duplicate_groups > 0 {
-        println!("\nNote: Use --show-only flag to preview duplicates without making changes.");
-        println!("Automatic deduplication not yet implemented.");
+        if let Some(strat) = strategy {
+            // Convert CLI strategy to dedupe module strategy
+            let dedupe_strategy = match strat {
+                Strategy::Delete => dedupe::DedupeStrategy::Delete,
+                Strategy::Move => {
+                    let dir = target_dir
+                        .as_ref()
+                        .ok_or_else(|| anyhow::anyhow!("--target-dir required for move strategy"))?;
+                    dedupe::DedupeStrategy::Move(PathBuf::from(dir))
+                }
+                Strategy::Symlink => dedupe::DedupeStrategy::Symlink,
+                Strategy::Archive => {
+                    let dir = target_dir
+                        .as_ref()
+                        .ok_or_else(|| anyhow::anyhow!("--target-dir required for archive strategy"))?;
+                    dedupe::DedupeStrategy::Archive(PathBuf::from(dir))
+                }
+            };
+            
+            let engine = dedupe::DedupeEngine::new(dedupe_strategy, dry_run, auto);
+            
+            println!("\n=== Applying Deduplication ===");
+            if dry_run {
+                println!("[DRY RUN MODE - No files will be modified]");
+            }
+            
+            let mut total_result = dedupe::DedupeResult::default();
+            
+            // Process duplicates from each bucket
+            for bucket_name in &bucket_names {
+                let bucket = db.bucket(bucket_name)?;
+                
+                if bucket.count()? == 0 {
+                    continue;
+                }
+                
+                let duplicates = bucket.find_duplicates()?;
+                
+                for (_hash, files) in duplicates {
+                    // Convert file keys to paths
+                    let paths: Vec<PathBuf> = files.iter()
+                        .map(|f| PathBuf::from(f))
+                        .collect();
+                    
+                    if let Ok(result) = engine.process_duplicates(&paths) {
+                        total_result.deleted += result.deleted;
+                        total_result.moved += result.moved;
+                        total_result.symlinked += result.symlinked;
+                        total_result.archived += result.archived;
+                        total_result.skipped += result.skipped;
+                        total_result.space_freed += result.space_freed;
+                    }
+                }
+            }
+            
+            println!("\n=== Deduplication Complete ===");
+            println!("{}", total_result.summary());
+        } else {
+            println!("\nNote: Use --strategy flag to automatically deduplicate files.");
+            println!("Available strategies: delete, move, symlink, archive");
+            println!("Use --dry-run to preview changes without applying them.");
+        }
     }
     
     db.close()?;
