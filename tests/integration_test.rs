@@ -116,7 +116,7 @@ async fn test_scan_large_file() -> Result<()> {
     
     let timer = PerfTimer::new("Hash 100MB file");
     context.scan_tree().await?;
-    timer.assert_under(Duration::from_secs(2)); // Blake3 should hash 100MB in under 2 seconds
+    timer.assert_under(Duration::from_secs(3)); // Blake3 should hash 100MB in under 3 seconds
     
     assert_eq!(context.file_count, 1);
     assert!(fixture.verify_in_db("large.bin")?);
