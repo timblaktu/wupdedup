@@ -259,6 +259,7 @@ mod tests {
             access_token: "test_token".to_string(),
             access_token_secret: "test_token_secret".to_string(),
             user_nickname: Some("test_user".to_string()),
+            mock_mode: false,
         }
     }
 

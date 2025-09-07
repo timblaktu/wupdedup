@@ -1,0 +1,37 @@
+# Example SmugMug configuration for wupdedup-rs
+
+# Basic configuration
+log_level = "info"
+db_file = "wupdedup.db"
+
+# SmugMug configuration with MOCK MODE enabled
+# This allows testing without real SmugMug credentials
+[smugmug]
+# For mock mode, these can be any non-empty strings
+api_key = "mock_key"
+api_secret = "mock_secret"
+access_token = "mock_token"
+access_token_secret = "mock_token_secret"
+
+# Enable mock mode - no real API calls will be made
+# Set to false when you have real credentials
+mock_mode = true
+
+# Optional: your SmugMug nickname
+user_nickname = "test_user"
+
+# Example with REAL credentials (mock_mode = false)
+# [smugmug]
+# api_key = "your_real_api_key_here"
+# api_secret = "your_real_api_secret_here"
+# access_token = "your_oauth_access_token"
+# access_token_secret = "your_oauth_access_token_secret"
+# mock_mode = false
+# user_nickname = "your_smugmug_username"
+
+# You can also use environment variables:
+# WUPDEDUP_SMUGMUG_API_KEY=your_key
+# WUPDEDUP_SMUGMUG_API_SECRET=your_secret
+# WUPDEDUP_SMUGMUG_ACCESS_TOKEN=your_token
+# WUPDEDUP_SMUGMUG_ACCESS_TOKEN_SECRET=your_token_secret
+# WUPDEDUP_SMUGMUG_MOCK_MODE=true

@@ -55,6 +55,8 @@ pub struct SmugMugConfig {
     pub access_token_secret: String,
     #[serde(default)]
     pub user_nickname: Option<String>,  // Optional: If not provided, will fetch authenticated user
+    #[serde(default)]
+    pub mock_mode: bool,  // Use mock data instead of real API (for testing)
 }
 
 impl SmugMugConfig {
@@ -63,6 +65,11 @@ impl SmugMugConfig {
     }
 
     pub fn valid(&self) -> Result<bool> {
+        // In mock mode, we don't need real credentials
+        if self.mock_mode {
+            return Ok(true);
+        }
+        
         if self.api_key.is_empty() || self.api_secret.is_empty() {
             anyhow::bail!("SmugMug API key and secret are required");
         }

@@ -8,6 +8,7 @@ use crate::db::Bucket;
 
 pub mod local;
 pub mod smugmug;
+pub mod smugmug_mock;
 
 // Strategy pattern interface implemented by storage providers
 #[async_trait]
@@ -73,9 +74,14 @@ pub fn load_storage_strategy_contexts(config: &Config) -> Result<Vec<StorageStra
     
     if let Some(smugmug_config) = &config.smugmug {
         if smugmug_config.specified() && smugmug_config.valid()? {
-            let strategy = Arc::new(smugmug::SmugMugStrategy::new(smugmug_config.clone())?);
+            let strategy: Arc<dyn StorageStrategy> = if smugmug_config.mock_mode {
+                info!("Using MOCK SmugMug strategy (no real API calls)");
+                Arc::new(smugmug_mock::MockSmugMugStrategy::new(smugmug_config.clone())?)
+            } else {
+                Arc::new(smugmug::SmugMugStrategy::new(smugmug_config.clone())?)
+            };
             contexts.push(StorageStrategyContext::new(strategy, "smugmug".to_string()));
-            debug!("Loaded SmugMugStrategy");
+            debug!("Loaded SmugMugStrategy (mock: {})", smugmug_config.mock_mode);
         }
     }
     
@@ -199,6 +205,7 @@ mod tests {
                 access_token: "test_token".to_string(),
                 access_token_secret: "test_token_secret".to_string(),
                 user_nickname: Some("test_user".to_string()),
+                mock_mode: false,
             }),
         };
         
@@ -223,6 +230,7 @@ mod tests {
                 access_token: "test_token".to_string(),
                 access_token_secret: "test_token_secret".to_string(),
                 user_nickname: Some("test_user".to_string()),
+                mock_mode: false,
             }),
         };
         
