@@ -48,11 +48,11 @@ impl StorageStrategyContext {
             node_count: 0,
         }
     }
-    
+
     pub fn set_bucket(&mut self, bucket: Bucket) {
         self.bucket = Some(bucket);
     }
-    
+
     pub async fn scan_tree(&mut self) -> Result<()> {
         // Clone the Arc to avoid borrowing issues
         let strategy = self.storage_strategy.clone();
@@ -63,7 +63,7 @@ impl StorageStrategyContext {
 // Utility function to load concrete StorageStrategy instances from config
 pub fn load_storage_strategy_contexts(config: &Config) -> Result<Vec<StorageStrategyContext>> {
     let mut contexts = Vec::new();
-    
+
     if let Some(local_config) = &config.local {
         if local_config.specified() && local_config.valid()? {
             let strategy = Arc::new(local::LocalStrategy::new(local_config.clone()));
@@ -71,7 +71,7 @@ pub fn load_storage_strategy_contexts(config: &Config) -> Result<Vec<StorageStra
             debug!("Loaded LocalStrategy");
         }
     }
-    
+
     if let Some(smugmug_config) = &config.smugmug {
         if smugmug_config.specified() && smugmug_config.valid()? {
             let strategy: Arc<dyn StorageStrategy> = if smugmug_config.mock_mode {
@@ -84,16 +84,16 @@ pub fn load_storage_strategy_contexts(config: &Config) -> Result<Vec<StorageStra
             debug!("Loaded SmugMugStrategy (mock: {})", smugmug_config.mock_mode);
         }
     }
-    
+
     if contexts.is_empty() {
         anyhow::bail!("No storage strategies specified in config");
     }
-    
+
     info!("Loaded {} storage strategy contexts", contexts.len());
     for context in &contexts {
         info!("  - {}", context.name);
     }
-    
+
     Ok(contexts)
 }
 
@@ -137,7 +137,7 @@ mod tests {
     fn test_storage_context_creation() {
         let strategy = Arc::new(MockStrategy::new("test"));
         let context = StorageStrategyContext::new(strategy.clone(), "test_context".to_string());
-        
+
         assert_eq!(context.name, "test_context");
         assert_eq!(context.file_count, 0);
         assert_eq!(context.node_count, 0);
@@ -148,9 +148,9 @@ mod tests {
     async fn test_storage_context_scan() {
         let strategy = Arc::new(MockStrategy::new("test"));
         let mut context = StorageStrategyContext::new(strategy.clone(), "test_context".to_string());
-        
+
         context.scan_tree().await.unwrap();
-        
+
         assert_eq!(context.file_count, 42);
         assert_eq!(context.node_count, 10);
         assert!(*strategy.scan_called.lock().unwrap());
@@ -160,15 +160,15 @@ mod tests {
     fn test_storage_context_set_bucket() {
         use crate::db::DB;
         use tempfile::tempdir;
-        
+
         let temp_dir = tempdir().unwrap();
         let db_path = temp_dir.path().join("test.db");
         let db = DB::init(db_path.to_str().unwrap()).unwrap();
         let bucket = db.bucket("test").unwrap();
-        
+
         let strategy = Arc::new(MockStrategy::new("test"));
         let mut context = StorageStrategyContext::new(strategy, "test_context".to_string());
-        
+
         assert!(context.bucket.is_none());
         context.set_bucket(bucket);
         assert!(context.bucket.is_some());
@@ -186,7 +186,7 @@ mod tests {
             }),
             smugmug: None,
         };
-        
+
         let contexts = load_storage_strategy_contexts(&config).unwrap();
         assert_eq!(contexts.len(), 1);
         assert_eq!(contexts[0].name, "local");
@@ -208,7 +208,7 @@ mod tests {
                 mock_mode: false,
             }),
         };
-        
+
         let contexts = load_storage_strategy_contexts(&config).unwrap();
         assert_eq!(contexts.len(), 1);
         assert_eq!(contexts[0].name, "smugmug");
@@ -233,7 +233,7 @@ mod tests {
                 mock_mode: false,
             }),
         };
-        
+
         let contexts = load_storage_strategy_contexts(&config).unwrap();
         assert_eq!(contexts.len(), 2);
         assert!(contexts.iter().any(|c| c.name == "local"));
@@ -249,10 +249,13 @@ mod tests {
             local: None,
             smugmug: None,
         };
-        
+
         let result = load_storage_strategy_contexts(&config);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("No storage strategies"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("No storage strategies"));
     }
 
     #[test]
@@ -266,7 +269,7 @@ mod tests {
             }),
             smugmug: None,
         };
-        
+
         let result = load_storage_strategy_contexts(&config);
         assert!(result.is_err());
     }

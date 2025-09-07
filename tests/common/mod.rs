@@ -24,9 +24,9 @@ impl TestFixture {
         let temp_dir = tempdir()?;
         let root_path = temp_dir.path().join("test_files");
         let db_path = temp_dir.path().join("test.db");
-        
+
         fs::create_dir_all(&root_path)?;
-        
+
         Ok(Self {
             temp_dir,
             root_path,
@@ -34,7 +34,7 @@ impl TestFixture {
             db: None,
         })
     }
-    
+
     /// Initialize database for the fixture
     pub fn with_db(mut self) -> Result<Self> {
         // Ensure the parent directory exists
@@ -44,7 +44,7 @@ impl TestFixture {
         self.db = Some(DB::init(self.db_path.to_str().unwrap())?);
         Ok(self)
     }
-    
+
     /// Create a test file with specific content
     pub fn create_file(&self, relative_path: &str, content: &[u8]) -> Result<PathBuf> {
         let file_path = self.root_path.join(relative_path);
@@ -54,14 +54,15 @@ impl TestFixture {
         fs::write(&file_path, content)?;
         Ok(file_path)
     }
-    
+
     /// Create multiple test files
     pub fn create_files(&self, files: &[(&str, &[u8])]) -> Result<Vec<PathBuf>> {
-        files.iter()
+        files
+            .iter()
             .map(|(path, content)| self.create_file(path, content))
             .collect()
     }
-    
+
     /// Create a standard test file structure
     pub fn create_standard_layout(&self) -> Result<()> {
         self.create_files(&[
@@ -75,7 +76,7 @@ impl TestFixture {
         ])?;
         Ok(())
     }
-    
+
     /// Create files with duplicate content
     pub fn create_duplicates(&self) -> Result<()> {
         let duplicate_content = b"this is duplicate content";
@@ -87,13 +88,13 @@ impl TestFixture {
         ])?;
         Ok(())
     }
-    
+
     /// Create large file for performance testing
     pub fn create_large_file(&self, name: &str, size_mb: usize) -> Result<PathBuf> {
         let content = vec![0u8; size_mb * 1024 * 1024];
         self.create_file(name, &content)
     }
-    
+
     /// Get test configuration
     pub fn get_config(&self) -> Config {
         Config {
@@ -106,7 +107,7 @@ impl TestFixture {
             profile: Default::default(),
         }
     }
-    
+
     /// Verify file exists in database
     pub fn verify_in_db(&self, relative_path: &str) -> Result<bool> {
         if let Some(db) = &self.db {
@@ -118,7 +119,7 @@ impl TestFixture {
             Ok(false)
         }
     }
-    
+
     /// Count total files in database
     pub fn count_db_files(&self) -> Result<usize> {
         if let Some(db) = &self.db {
@@ -154,27 +155,25 @@ impl TestScenarioBuilder {
             duplicate_groups: Vec::new(),
         })
     }
-    
+
     pub fn with_files(mut self, count: usize) -> Self {
         self.file_count = count;
         self
     }
-    
+
     pub fn with_duplicate_group(mut self, paths: Vec<String>) -> Self {
         self.duplicate_groups.push(paths);
         self
     }
-    
+
     pub fn build(self) -> Result<TestFixture> {
         // Create unique files
         for i in 0..self.file_count {
             let content = format!("unique content {}", i);
-            self.fixture.create_file(
-                &format!("file_{}.txt", i),
-                content.as_bytes()
-            )?;
+            self.fixture
+                .create_file(&format!("file_{}.txt", i), content.as_bytes())?;
         }
-        
+
         // Create duplicate groups
         for (group_idx, paths) in self.duplicate_groups.iter().enumerate() {
             let content = format!("duplicate group {}", group_idx);
@@ -182,7 +181,7 @@ impl TestScenarioBuilder {
                 self.fixture.create_file(path, content.as_bytes())?;
             }
         }
-        
+
         Ok(self.fixture)
     }
 }
@@ -191,38 +190,46 @@ impl TestScenarioBuilder {
 pub mod assertions {
     use super::*;
     use pretty_assertions::assert_eq;
-    
+
     pub fn assert_file_exists(fixture: &TestFixture, relative_path: &str) {
         let full_path = fixture.root_path.join(relative_path);
         assert!(full_path.exists(), "File should exist: {:?}", full_path);
     }
-    
+
     pub fn assert_file_content(fixture: &TestFixture, relative_path: &str, expected: &[u8]) {
         let full_path = fixture.root_path.join(relative_path);
         let actual = fs::read(&full_path).expect("Should read file");
-        assert_eq!(actual, expected, "File content mismatch for {:?}", full_path);
+        assert_eq!(
+            actual, expected,
+            "File content mismatch for {:?}",
+            full_path
+        );
     }
-    
-    pub fn assert_files_have_same_hash(fixture: &TestFixture, path1: &str, path2: &str) -> Result<()> {
+
+    pub fn assert_files_have_same_hash(
+        fixture: &TestFixture,
+        path1: &str,
+        path2: &str,
+    ) -> Result<()> {
         use blake3::Hasher;
-        
+
         let file1 = fixture.root_path.join(path1);
         let file2 = fixture.root_path.join(path2);
-        
+
         let hash1 = {
             let content = fs::read(&file1)?;
             let mut hasher = Hasher::new();
             hasher.update(&content);
             hasher.finalize()
         };
-        
+
         let hash2 = {
             let content = fs::read(&file2)?;
             let mut hasher = Hasher::new();
             hasher.update(&content);
             hasher.finalize()
         };
-        
+
         assert_eq!(hash1, hash2, "Files should have same hash");
         Ok(())
     }
@@ -232,12 +239,12 @@ pub mod assertions {
 pub mod perf {
     use super::*;
     use std::time::{Duration, Instant};
-    
+
     pub struct PerfTimer {
         start: Instant,
         name: String,
     }
-    
+
     impl PerfTimer {
         pub fn new(name: impl Into<String>) -> Self {
             Self {
@@ -245,21 +252,23 @@ pub mod perf {
                 name: name.into(),
             }
         }
-        
+
         pub fn elapsed(&self) -> Duration {
             self.start.elapsed()
         }
-        
+
         pub fn assert_under(&self, max_duration: Duration) {
             let elapsed = self.elapsed();
             assert!(
                 elapsed < max_duration,
                 "{} took {:?}, expected under {:?}",
-                self.name, elapsed, max_duration
+                self.name,
+                elapsed,
+                max_duration
             );
         }
     }
-    
+
     impl Drop for PerfTimer {
         fn drop(&mut self) {
             println!("{} took {:?}", self.name, self.elapsed());
@@ -270,15 +279,15 @@ pub mod perf {
 /// Test data generators
 pub mod generators {
     use proptest::prelude::*;
-    
+
     pub fn file_path_strategy() -> impl Strategy<Value = String> {
         "[a-z]+(/[a-z]+){0,3}\\.[a-z]{2,4}"
     }
-    
+
     pub fn file_content_strategy() -> impl Strategy<Value = Vec<u8>> {
         prop::collection::vec(any::<u8>(), 0..10000)
     }
-    
+
     pub fn hash_strategy() -> impl Strategy<Value = String> {
         "[0-9a-f]{64}"
     }

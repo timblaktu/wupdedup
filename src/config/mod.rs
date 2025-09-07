@@ -41,7 +41,10 @@ impl LocalConfig {
             anyhow::bail!("LocalConfig.root_path does not exist: {:?}", self.root_path);
         }
         if !self.root_path.is_dir() {
-            anyhow::bail!("LocalConfig.root_path is not a directory: {:?}", self.root_path);
+            anyhow::bail!(
+                "LocalConfig.root_path is not a directory: {:?}",
+                self.root_path
+            );
         }
         Ok(true)
     }
@@ -83,33 +86,33 @@ impl SmugMugConfig {
 impl Config {
     pub fn load() -> Result<Self> {
         debug!("Loading configuration");
-        
+
         // Start with default configuration
         let mut builder = ConfigBuilder::builder()
             .set_default("log_level", "info")?
             .set_default("db_file", "wupdedup.bolt.db")?
             .set_default("profile.enabled", false)?;
-        
+
         // Load from .env file if it exists
         if Path::new(".env").exists() {
             dotenvy::dotenv().ok();
         }
-        
+
         // Load from config files (optional)
         builder = builder
             .add_source(File::with_name("config").required(false))
             .add_source(File::with_name("config.local").required(false));
-        
+
         // Override with environment variables
         builder = builder.add_source(
             Environment::with_prefix("WUPDEDUP")
                 .separator("_")
                 .try_parsing(true),
         );
-        
+
         let config = builder.build()?;
         let settings: Config = config.try_deserialize()?;
-        
+
         debug!("Configuration loaded: {:?}", settings);
         Ok(settings)
     }
@@ -154,20 +157,20 @@ mod tests {
     fn test_local_config_validation() {
         let temp_dir = TempDir::new().unwrap();
         let valid_path = temp_dir.path().to_path_buf();
-        
+
         let local_config = LocalConfig {
             root_path: valid_path.clone(),
         };
-        
+
         assert!(local_config.specified());
         assert!(local_config.valid().unwrap());
-        
+
         // Test with non-existent path
         let invalid_config = LocalConfig {
             root_path: PathBuf::from("/nonexistent/path"),
         };
         assert!(invalid_config.valid().is_err());
-        
+
         // Test with file instead of directory
         let file_path = valid_path.join("test.txt");
         std::fs::write(&file_path, "test").unwrap();
@@ -186,10 +189,10 @@ mod tests {
             access_token_secret: "test_token_secret".to_string(),
             user_nickname: Some("test_user".to_string()),
         };
-        
+
         assert!(valid_config.specified());
         assert!(valid_config.valid().unwrap());
-        
+
         // Test with empty API key
         let invalid_config = SmugMugConfig {
             api_key: "".to_string(),
@@ -211,15 +214,15 @@ mod tests {
         // Save current env values
         let saved_log_level = env::var("WUPDEDUP_LOG_LEVEL").ok();
         let saved_db_file = env::var("WUPDEDUP_DB_FILE").ok();
-        
+
         // Set test env values
         env::set_var("WUPDEDUP_LOG_LEVEL", "debug");
         env::set_var("WUPDEDUP_DB_FILE", "test.db");
-        
+
         // Load config (this would normally work in a real environment)
         // Note: In tests, the config loading might not pick up env vars properly
         // due to how the config crate initializes
-        
+
         // Restore env values
         match saved_log_level {
             Some(val) => env::set_var("WUPDEDUP_LOG_LEVEL", val),

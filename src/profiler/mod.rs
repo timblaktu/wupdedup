@@ -20,15 +20,15 @@ impl Profiler {
             output_file: None,
         }
     }
-    
+
     pub fn start(&mut self) -> Result<()> {
         if !self.config.enabled {
             return Ok(());
         }
-        
+
         debug!("Starting profiler");
         self.start_time = Some(Instant::now());
-        
+
         if let Some(mode) = &self.config.mode {
             match mode.as_str() {
                 "cpu" => {
@@ -48,35 +48,35 @@ impl Profiler {
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     pub fn stop(&mut self) -> Result<()> {
         if !self.config.enabled {
             return Ok(());
         }
-        
+
         if let Some(start) = self.start_time {
             let duration = start.elapsed();
             info!("Profiling complete. Total duration: {:?}", duration);
-            
+
             // Write results to file if configured
             if let Some(ref mut file) = self.output_file {
                 writeln!(file, "Total execution time: {:?}", duration)?;
             }
         }
-        
+
         debug!("Profiler stopped");
         Ok(())
     }
-    
+
     #[allow(dead_code)]
     pub fn mark(&self, label: &str) {
         if !self.config.enabled {
             return;
         }
-        
+
         if let Some(start) = self.start_time {
             let elapsed = start.elapsed();
             debug!("Profile mark [{}]: {:?}", label, elapsed);
@@ -96,7 +96,7 @@ mod tests {
             enabled: false,
             mode: None,
         };
-        
+
         let mut profiler = Profiler::new(config);
         assert!(profiler.start().is_ok());
         assert!(profiler.stop().is_ok());
@@ -110,13 +110,13 @@ mod tests {
             enabled: true,
             mode: None,
         };
-        
+
         let mut profiler = Profiler::new(config);
         assert!(profiler.start().is_ok());
-        
+
         // Simulate some work
         thread::sleep(Duration::from_millis(10));
-        
+
         profiler.mark("checkpoint");
         assert!(profiler.stop().is_ok());
     }
@@ -127,7 +127,7 @@ mod tests {
             enabled: true,
             mode: Some("cpu".to_string()),
         };
-        
+
         let mut profiler = Profiler::new(config);
         assert!(profiler.start().is_ok());
         assert!(profiler.stop().is_ok());
@@ -139,7 +139,7 @@ mod tests {
             enabled: true,
             mode: Some("memory".to_string()),
         };
-        
+
         let mut profiler = Profiler::new(config);
         assert!(profiler.start().is_ok());
         assert!(profiler.stop().is_ok());
@@ -151,7 +151,7 @@ mod tests {
             enabled: true,
             mode: Some("trace".to_string()),
         };
-        
+
         let mut profiler = Profiler::new(config);
         assert!(profiler.start().is_ok());
         assert!(profiler.stop().is_ok());
@@ -163,18 +163,18 @@ mod tests {
             enabled: true,
             mode: None,
         };
-        
+
         let mut profiler = Profiler::new(config);
         profiler.start().unwrap();
-        
+
         thread::sleep(Duration::from_millis(50));
-        
+
         // Check that start_time is set
         assert!(profiler.start_time.is_some());
-        
+
         let elapsed = profiler.start_time.unwrap().elapsed();
         assert!(elapsed >= Duration::from_millis(50));
-        
+
         profiler.stop().unwrap();
     }
 
@@ -184,18 +184,18 @@ mod tests {
             enabled: true,
             mode: None,
         };
-        
+
         let mut profiler = Profiler::new(config);
         profiler.start().unwrap();
-        
+
         profiler.mark("start_processing");
         thread::sleep(Duration::from_millis(10));
-        
+
         profiler.mark("mid_processing");
         thread::sleep(Duration::from_millis(10));
-        
+
         profiler.mark("end_processing");
-        
+
         profiler.stop().unwrap();
     }
 }

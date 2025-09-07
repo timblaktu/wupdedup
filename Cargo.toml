@@ -7,6 +7,13 @@ description = "A modular multicloud storage management and deduplication tool"
 license = "MIT"
 repository = "https://github.com/timblaktu/wupdedup"
 
+# Lint configuration - treat warnings as errors in CI
+[lints.rust]
+warnings = "deny"
+dead_code = "warn"  # Allow dead_code during development with explicit #[allow()]
+unused_imports = "deny"
+unused_variables = "deny"
+
 [dependencies]
 # Core dependencies
 tokio = { version = "1.41", features = ["full"] }

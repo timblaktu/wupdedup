@@ -9,7 +9,7 @@ pub fn get_type(path: &Path) -> Result<String> {
     let mut buffer = vec![0u8; 512];
     let bytes_read = file.read(&mut buffer)?;
     buffer.truncate(bytes_read);
-    
+
     // Use infer crate to detect MIME type
     if let Some(kind) = infer::get(&buffer) {
         Ok(kind.mime_type().to_string())
@@ -29,7 +29,8 @@ pub fn get_type(path: &Path) -> Result<String> {
                 "tar" => "application/x-tar",
                 "gz" => "application/gzip",
                 _ => "application/octet-stream",
-            }.to_string())
+            }
+            .to_string())
         } else {
             Ok("application/octet-stream".to_string())
         }
@@ -58,14 +59,15 @@ pub fn is_text(mime_type: &str) -> bool {
 
 #[allow(dead_code)]
 pub fn is_document(mime_type: &str) -> bool {
-    matches!(mime_type,
-        "application/pdf" |
-        "application/msword" |
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" |
-        "application/vnd.ms-excel" |
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" |
-        "application/vnd.ms-powerpoint" |
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    matches!(
+        mime_type,
+        "application/pdf"
+            | "application/msword"
+            | "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            | "application/vnd.ms-excel"
+            | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            | "application/vnd.ms-powerpoint"
+            | "application/vnd.openxmlformats-officedocument.presentationml.presentation"
     )
 }
 
@@ -78,38 +80,38 @@ mod tests {
     #[test]
     fn test_get_type_with_known_files() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Test text file
         let txt_path = temp_dir.path().join("test.txt");
         fs::write(&txt_path, "Hello, world!").unwrap();
         assert_eq!(get_type(&txt_path).unwrap(), "text/plain");
-        
+
         // Test HTML file
         let html_path = temp_dir.path().join("test.html");
         fs::write(&html_path, "<html><body>Test</body></html>").unwrap();
         assert_eq!(get_type(&html_path).unwrap(), "text/html");
-        
+
         // Test JSON file
         let json_path = temp_dir.path().join("test.json");
         fs::write(&json_path, r#"{"key": "value"}"#).unwrap();
         assert_eq!(get_type(&json_path).unwrap(), "application/json");
-        
+
         // Test file with no extension
         let no_ext_path = temp_dir.path().join("noext");
         fs::write(&no_ext_path, "some content").unwrap();
         assert_eq!(get_type(&no_ext_path).unwrap(), "application/octet-stream");
     }
-    
+
     #[test]
     fn test_get_type_with_binary_content() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Create a PNG file (minimal valid PNG header)
         let png_path = temp_dir.path().join("test.png");
         let png_header = vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
         fs::write(&png_path, png_header).unwrap();
         assert_eq!(get_type(&png_path).unwrap(), "image/png");
-        
+
         // Create a JPEG file (minimal valid JPEG header)
         let jpg_path = temp_dir.path().join("test.jpg");
         let jpg_header = vec![0xFF, 0xD8, 0xFF, 0xE0];
@@ -157,7 +159,9 @@ mod tests {
     fn test_is_document() {
         assert!(is_document("application/pdf"));
         assert!(is_document("application/msword"));
-        assert!(is_document("application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
+        assert!(is_document(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ));
         assert!(!is_document("text/plain"));
         assert!(!is_document("image/png"));
     }
