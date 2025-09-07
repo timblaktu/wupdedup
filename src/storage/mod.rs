@@ -73,7 +73,7 @@ pub fn load_storage_strategy_contexts(config: &Config) -> Result<Vec<StorageStra
     
     if let Some(smugmug_config) = &config.smugmug {
         if smugmug_config.specified() && smugmug_config.valid()? {
-            let strategy = Arc::new(smugmug::SmugMugStrategy::new(smugmug_config.clone()));
+            let strategy = Arc::new(smugmug::SmugMugStrategy::new(smugmug_config.clone())?);
             contexts.push(StorageStrategyContext::new(strategy, "smugmug".to_string()));
             debug!("Loaded SmugMugStrategy");
         }
@@ -194,15 +194,11 @@ mod tests {
             profile: Default::default(),
             local: None,
             smugmug: Some(SmugMugConfig {
-                url: "https://api.smugmug.com".to_string(),
                 api_key: "test_key".to_string(),
                 api_secret: "test_secret".to_string(),
-                user_token: "user_token".to_string(),
-                user_secret: "user_secret".to_string(),
-                destination: "Albums".to_string(),
-                file_names: "original".to_string(),
-                use_metadata_times: true,
-                force_metadata_times: false,
+                access_token: "test_token".to_string(),
+                access_token_secret: "test_token_secret".to_string(),
+                user_nickname: Some("test_user".to_string()),
             }),
         };
         
@@ -222,15 +218,11 @@ mod tests {
                 root_path: temp_dir.path().to_path_buf(),
             }),
             smugmug: Some(SmugMugConfig {
-                url: "https://api.smugmug.com".to_string(),
                 api_key: "test_key".to_string(),
                 api_secret: "test_secret".to_string(),
-                user_token: "user_token".to_string(),
-                user_secret: "user_secret".to_string(),
-                destination: "Albums".to_string(),
-                file_names: "original".to_string(),
-                use_metadata_times: true,
-                force_metadata_times: false,
+                access_token: "test_token".to_string(),
+                access_token_secret: "test_token_secret".to_string(),
+                user_nickname: Some("test_user".to_string()),
             }),
         };
         

@@ -49,15 +49,12 @@ impl LocalConfig {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SmugMugConfig {
-    pub url: String,
     pub api_key: String,
     pub api_secret: String,
-    pub user_token: String,
-    pub user_secret: String,
-    pub destination: String,
-    pub file_names: String,
-    pub use_metadata_times: bool,
-    pub force_metadata_times: bool,
+    pub access_token: String,
+    pub access_token_secret: String,
+    #[serde(default)]
+    pub user_nickname: Option<String>,  // Optional: If not provided, will fetch authenticated user
 }
 
 impl SmugMugConfig {
@@ -67,7 +64,10 @@ impl SmugMugConfig {
 
     pub fn valid(&self) -> Result<bool> {
         if self.api_key.is_empty() || self.api_secret.is_empty() {
-            anyhow::bail!("SmugMug API credentials are not configured");
+            anyhow::bail!("SmugMug API key and secret are required");
+        }
+        if self.access_token.is_empty() || self.access_token_secret.is_empty() {
+            anyhow::bail!("SmugMug access tokens are required");
         }
         Ok(true)
     }
@@ -173,15 +173,11 @@ mod tests {
     #[test]
     fn test_smugmug_config_validation() {
         let valid_config = SmugMugConfig {
-            url: "https://api.smugmug.com".to_string(),
             api_key: "test_key".to_string(),
             api_secret: "test_secret".to_string(),
-            user_token: "user_token".to_string(),
-            user_secret: "user_secret".to_string(),
-            destination: "Albums".to_string(),
-            file_names: "original".to_string(),
-            use_metadata_times: true,
-            force_metadata_times: false,
+            access_token: "test_token".to_string(),
+            access_token_secret: "test_token_secret".to_string(),
+            user_nickname: Some("test_user".to_string()),
         };
         
         assert!(valid_config.specified());
@@ -194,6 +190,13 @@ mod tests {
         };
         assert!(!invalid_config.specified());
         assert!(invalid_config.valid().is_err());
+        
+        // Test with empty access token
+        let invalid_config2 = SmugMugConfig {
+            access_token: "".to_string(),
+            ..valid_config.clone()
+        };
+        assert!(invalid_config2.valid().is_err());
     }
 
     #[test]
