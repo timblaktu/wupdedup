@@ -1,6 +1,6 @@
 mod common;
 
-use anyhow::Result;
+// use anyhow::Result;
 use proptest::prelude::*;
 use std::collections::HashMap;
 use tempfile::tempdir;
@@ -211,7 +211,7 @@ proptest! {
 #[ignore] // This test is slow and async, run with --ignored flag
 fn prop_scan_reproducible() {
     use std::sync::Arc;
-    use wupdedup_rs::storage::{StorageStrategy, StorageStrategyContext};
+    use wupdedup_rs::storage::StorageStrategyContext;
 
     // Note: This is a simplified version that doesn't use proptest due to async complexity
     // For production, consider using proptest-tokio or similar

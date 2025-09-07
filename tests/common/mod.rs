@@ -1,23 +1,27 @@
 use anyhow::Result;
 use once_cell::sync::Lazy;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Mutex;
 use tempfile::{tempdir, TempDir};
 use wupdedup_rs::config::{Config, LocalConfig};
 use wupdedup_rs::db::DB;
 
 // Global test mutex for tests that need exclusive access
+#[allow(dead_code)] // Used across different test modules
 pub static TEST_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
 /// Test fixture for managing temporary directories and files
+#[allow(dead_code)] // Used across different test modules
 pub struct TestFixture {
+    #[allow(dead_code)] // Keep reference to prevent cleanup
     pub temp_dir: TempDir,
     pub root_path: PathBuf,
     pub db_path: PathBuf,
     pub db: Option<DB>,
 }
 
+#[allow(dead_code)] // Test utility functions used across different test modules
 impl TestFixture {
     /// Create a new test fixture with temp directory
     pub fn new() -> Result<Self> {
@@ -141,12 +145,14 @@ impl Drop for TestFixture {
 }
 
 /// Builder for creating complex test scenarios
+#[allow(dead_code)] // Test utility used across different test modules
 pub struct TestScenarioBuilder {
     fixture: TestFixture,
     file_count: usize,
     duplicate_groups: Vec<Vec<String>>,
 }
 
+#[allow(dead_code)] // Test utility functions used across different test modules
 impl TestScenarioBuilder {
     pub fn new() -> Result<Self> {
         Ok(Self {
@@ -187,6 +193,7 @@ impl TestScenarioBuilder {
 }
 
 /// Assertion helpers
+#[allow(dead_code)] // Test utility functions used across different test modules
 pub mod assertions {
     use super::*;
     use pretty_assertions::assert_eq;
@@ -236,15 +243,17 @@ pub mod assertions {
 }
 
 /// Performance testing helpers
+#[allow(dead_code)] // Test utility functions used across different test modules
 pub mod perf {
-    use super::*;
     use std::time::{Duration, Instant};
 
+    #[allow(dead_code)] // Test utility structure used across different test modules
     pub struct PerfTimer {
         start: Instant,
         name: String,
     }
 
+    #[allow(dead_code)] // Test utility functions used across different test modules
     impl PerfTimer {
         pub fn new(name: impl Into<String>) -> Self {
             Self {
@@ -277,6 +286,7 @@ pub mod perf {
 }
 
 /// Test data generators
+#[allow(dead_code)] // Test utility functions used across different test modules
 pub mod generators {
     use proptest::prelude::*;
 

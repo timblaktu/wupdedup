@@ -9,6 +9,7 @@ use crate::storage::{StorageStrategy, StorageStrategyContext};
 
 /// Mock SmugMug strategy for testing without real API credentials
 pub struct MockSmugMugStrategy {
+    #[allow(dead_code)] // Config stored for potential future use in mock behavior
     config: SmugMugConfig,
 }
 
@@ -165,6 +166,7 @@ mod tests {
             access_token: "mock_token".to_string(),
             access_token_secret: "mock_token_secret".to_string(),
             user_nickname: Some("mock_user".to_string()),
+            mock_mode: true,  // Always true for mock config
         }
     }
     

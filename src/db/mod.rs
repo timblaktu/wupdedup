@@ -282,7 +282,7 @@ impl Bucket {
                 let hash = &composite[..colon_pos];
                 hash_files
                     .entry(hash.to_string())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(file_key.value().to_string());
             }
         }

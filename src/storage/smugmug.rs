@@ -50,7 +50,7 @@ pub struct SmugMugStrategy {
 }
 
 impl SmugMugStrategy {
-    pub fn new(config: SmugMugConfig) -> Self {
+    pub fn new(config: SmugMugConfig) -> Result<Self> {
         let mut headers = header::HeaderMap::new();
         headers.insert(
             header::ACCEPT,
@@ -60,22 +60,22 @@ impl SmugMugStrategy {
         let client = Client::builder()
             .default_headers(headers)
             .build()
-            .expect("Failed to create HTTP client");
+            .map_err(|e| anyhow::anyhow!("Failed to create HTTP client: {}", e))?;
 
-        Self { config, client }
+        Ok(Self { config, client })
     }
 
     async fn authenticate(&self) -> Result<String> {
         // OAuth 1.0a authentication for SmugMug
         // This is a simplified version - real implementation would need proper OAuth signing
         warn!("SmugMug OAuth authentication not fully implemented - using placeholder token");
-        Ok(format!("Bearer {}", self.config.user_token))
+        Ok(format!("Bearer {}", self.config.access_token))
     }
 
     async fn fetch_albums(&self, auth_token: &str) -> Result<Vec<Album>> {
         let url = format!(
-            "{}/api/v2/user/{}/albums",
-            self.config.url, self.config.api_key
+            "https://api.smugmug.com/api/v2/user/{}/albums",
+            self.config.api_key
         );
 
         let response = self
@@ -94,7 +94,7 @@ impl SmugMugStrategy {
     }
 
     async fn fetch_images(&self, auth_token: &str, album_id: &str) -> Result<Vec<AlbumImage>> {
-        let url = format!("{}/api/v2/album/{}/images", self.config.url, album_id);
+        let url = format!("https://api.smugmug.com/api/v2/album/{}/images", album_id);
 
         let response = self
             .client
@@ -119,7 +119,7 @@ impl SmugMugStrategy {
 #[async_trait]
 impl StorageStrategy for SmugMugStrategy {
     async fn scan_tree(&self, context: &mut StorageStrategyContext) -> Result<()> {
-        info!("Starting SmugMug scan at: {}", self.config.url);
+        info!("Starting SmugMug scan");
 
         // Authenticate with SmugMug
         let auth_token = self.authenticate().await?;
@@ -248,32 +248,29 @@ mod tests {
 
     fn create_test_config() -> SmugMugConfig {
         SmugMugConfig {
-            url: "https://api.smugmug.com".to_string(),
             api_key: "test_key".to_string(),
             api_secret: "test_secret".to_string(),
-            user_token: "user_token".to_string(),
-            user_secret: "user_secret".to_string(),
-            destination: "Albums".to_string(),
-            file_names: "original".to_string(),
-            use_metadata_times: true,
-            force_metadata_times: false,
+            access_token: "test_access_token".to_string(),
+            access_token_secret: "test_access_secret".to_string(),
+            user_nickname: Some("test_user".to_string()),
+            mock_mode: false,
         }
     }
 
     #[test]
     fn test_smugmug_strategy_creation() {
         let config = create_test_config();
-        let strategy = SmugMugStrategy::new(config.clone());
+        let strategy = SmugMugStrategy::new(config.clone()).unwrap();
 
         assert_eq!(strategy.name(), "smugmug");
-        assert_eq!(strategy.config.url, config.url);
+        // Config no longer has URL field - SmugMug uses fixed API endpoint
         assert_eq!(strategy.config.api_key, config.api_key);
     }
 
     #[tokio::test]
     async fn test_smugmug_scan_with_mock_data() {
         let config = create_test_config();
-        let strategy = Arc::new(SmugMugStrategy::new(config));
+        let strategy = Arc::new(SmugMugStrategy::new(config).unwrap());
         let mut context = StorageStrategyContext::new(strategy.clone(), "smugmug".to_string());
 
         // Should complete without error and return mock data
@@ -286,44 +283,48 @@ mod tests {
     }
 
     #[test]
-    fn test_smugmug_config_with_different_destinations() {
+    fn test_smugmug_config_with_mock_mode() {
         let mut config = create_test_config();
 
-        // Test different destination values
-        let destinations = vec!["Albums", "Folders", "Gallery"];
+        // Test mock mode enabled
+        config.mock_mode = true;
+        let strategy = SmugMugStrategy::new(config.clone()).unwrap();
+        assert!(strategy.config.mock_mode);
 
-        for dest in destinations {
-            config.destination = dest.to_string();
-            let strategy = SmugMugStrategy::new(config.clone());
-            assert_eq!(strategy.config.destination, dest);
-        }
+        // Test mock mode disabled
+        config.mock_mode = false;
+        let strategy = SmugMugStrategy::new(config.clone()).unwrap();
+        assert!(!strategy.config.mock_mode);
     }
 
     #[test]
-    fn test_smugmug_config_with_different_file_names() {
+    fn test_smugmug_config_with_user_nickname() {
         let mut config = create_test_config();
 
-        // Test different file name options
-        let file_name_options = vec!["original", "custom", "sequential"];
+        // Test with user nickname
+        config.user_nickname = Some("photographer".to_string());
+        let strategy = SmugMugStrategy::new(config.clone()).unwrap();
+        assert_eq!(strategy.config.user_nickname, Some("photographer".to_string()));
 
-        for option in file_name_options {
-            config.file_names = option.to_string();
-            let strategy = SmugMugStrategy::new(config.clone());
-            assert_eq!(strategy.config.file_names, option);
-        }
+        // Test without user nickname
+        config.user_nickname = None;
+        let strategy = SmugMugStrategy::new(config.clone()).unwrap();
+        assert_eq!(strategy.config.user_nickname, None);
     }
 
     #[test]
-    fn test_smugmug_metadata_options() {
-        let mut config = create_test_config();
-
-        // Test metadata time options
-        config.use_metadata_times = false;
-        config.force_metadata_times = true;
-
-        let strategy = SmugMugStrategy::new(config.clone());
-        assert!(!strategy.config.use_metadata_times);
-        assert!(strategy.config.force_metadata_times);
+    fn test_smugmug_config_validation() {
+        let config = create_test_config();
+        
+        // Test that config is valid
+        assert!(config.valid().unwrap());
+        assert!(config.specified());
+        
+        // Test with empty credentials (should be invalid)
+        let mut invalid_config = config.clone();
+        invalid_config.api_key = "".to_string();
+        assert!(!invalid_config.specified());
+        assert!(invalid_config.valid().is_err());
     }
 
     #[tokio::test]
@@ -337,7 +338,7 @@ mod tests {
         let bucket = db.bucket("smugmug_test").unwrap();
 
         let config = create_test_config();
-        let strategy = Arc::new(SmugMugStrategy::new(config));
+        let strategy = Arc::new(SmugMugStrategy::new(config).unwrap());
         let mut context = StorageStrategyContext::new(strategy, "smugmug".to_string());
 
         context.set_bucket(bucket);
@@ -356,7 +357,7 @@ mod tests {
     #[tokio::test]
     async fn test_smugmug_authentication() {
         let config = create_test_config();
-        let strategy = SmugMugStrategy::new(config);
+        let strategy = SmugMugStrategy::new(config).unwrap();
 
         // Test authentication (returns placeholder token for now)
         let auth_result = strategy.authenticate().await;
@@ -364,6 +365,6 @@ mod tests {
 
         let token = auth_result.unwrap();
         assert!(token.starts_with("Bearer "));
-        assert!(token.contains("user_token"));
+        assert!(token.contains("test_access_token"));
     }
 }

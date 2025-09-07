@@ -2,10 +2,10 @@ use anyhow::Result;
 use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
-use wupdedup_rs::config::{Config, LocalConfig};
+use wupdedup_rs::config::LocalConfig;
 use wupdedup_rs::db::DB;
 use wupdedup_rs::storage::local::LocalStrategy;
-use wupdedup_rs::storage::{StorageStrategy, StorageStrategyContext};
+use wupdedup_rs::storage::StorageStrategyContext;
 
 fn create_test_files(dir: &Path) -> Result<()> {
     // Create test directory structure

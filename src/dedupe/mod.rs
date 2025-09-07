@@ -42,8 +42,10 @@ impl DedupeEngine {
                 "Original file not found: {}, skipping group",
                 original.display()
             );
-            let mut result = DedupeResult::default();
-            result.skipped = files.len();
+            let result = DedupeResult { 
+                skipped: files.len(), 
+                ..Default::default() 
+            };
             return Ok(result);
         }
 
