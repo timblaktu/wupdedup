@@ -4,8 +4,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tempfile::{tempdir, TempDir};
-use wupdedup_rs::config::{Config, LocalConfig};
-use wupdedup_rs::db::DB;
+use wupdedup::config::{Config, LocalConfig};
+use wupdedup::db::DB;
 
 // Global test mutex for tests that need exclusive access
 #[allow(dead_code)] // Used across different test modules

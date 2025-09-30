@@ -1,8 +1,8 @@
 use anyhow::Result;
 use tempfile::tempdir;
-use wupdedup_rs::config::{Config, SmugMugConfig};
-use wupdedup_rs::db::DB;
-use wupdedup_rs::storage::load_storage_strategy_contexts;
+use wupdedup::config::{Config, SmugMugConfig};
+use wupdedup::db::DB;
+use wupdedup::storage::load_storage_strategy_contexts;
 use std::sync::Arc;
 
 #[tokio::test]
@@ -79,8 +79,8 @@ async fn test_smugmug_mock_produces_consistent_data() -> Result<()> {
     let temp_dir2 = tempdir()?;
     
     // Run first scan
-    let strategy1 = Arc::new(wupdedup_rs::storage::smugmug_mock::MockSmugMugStrategy::new(config.clone())?);
-    let mut context1 = wupdedup_rs::storage::StorageStrategyContext::new(strategy1, "mock1".to_string());
+    let strategy1 = Arc::new(wupdedup::storage::smugmug_mock::MockSmugMugStrategy::new(config.clone())?);
+    let mut context1 = wupdedup::storage::StorageStrategyContext::new(strategy1, "mock1".to_string());
     
     let db1 = DB::init(temp_dir1.path().join("db1.db").to_str().unwrap())?;
     let bucket1 = db1.bucket("test1")?;
@@ -88,8 +88,8 @@ async fn test_smugmug_mock_produces_consistent_data() -> Result<()> {
     context1.scan_tree().await?;
     
     // Run second scan
-    let strategy2 = Arc::new(wupdedup_rs::storage::smugmug_mock::MockSmugMugStrategy::new(config)?);
-    let mut context2 = wupdedup_rs::storage::StorageStrategyContext::new(strategy2, "mock2".to_string());
+    let strategy2 = Arc::new(wupdedup::storage::smugmug_mock::MockSmugMugStrategy::new(config)?);
+    let mut context2 = wupdedup::storage::StorageStrategyContext::new(strategy2, "mock2".to_string());
     
     let db2 = DB::init(temp_dir2.path().join("db2.db").to_str().unwrap())?;
     let bucket2 = db2.bucket("test2")?;

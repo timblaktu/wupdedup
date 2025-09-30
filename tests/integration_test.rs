@@ -9,8 +9,8 @@ use serial_test::serial;
 use std::fs;
 use std::sync::Arc;
 use std::time::Duration;
-use wupdedup_rs::storage::local::LocalStrategy;
-use wupdedup_rs::storage::StorageStrategyContext;
+use wupdedup::storage::local::LocalStrategy;
+use wupdedup::storage::StorageStrategyContext;
 
 #[rstest]
 #[tokio::test]
@@ -216,10 +216,10 @@ async fn test_scan_persistence_across_sessions() -> Result<()> {
 
     // First scan
     {
-        let db = wupdedup_rs::db::DB::init(db_path.to_str().unwrap())?;
+        let db = wupdedup::db::DB::init(db_path.to_str().unwrap())?;
         let bucket = db.bucket("test")?;
 
-        let config = wupdedup_rs::config::LocalConfig {
+        let config = wupdedup::config::LocalConfig {
             root_path: root_path.clone(),
         };
 
@@ -236,7 +236,7 @@ async fn test_scan_persistence_across_sessions() -> Result<()> {
 
     // Reopen database and verify data persisted
     {
-        let db = wupdedup_rs::db::DB::init(db_path.to_str().unwrap())?;
+        let db = wupdedup::db::DB::init(db_path.to_str().unwrap())?;
         let bucket = db.bucket("test")?;
         assert_eq!(bucket.count()?, 7);
 

@@ -4,8 +4,8 @@ mod common;
 use proptest::prelude::*;
 use std::collections::HashMap;
 use tempfile::tempdir;
-use wupdedup_rs::config::LocalConfig;
-use wupdedup_rs::storage::local::LocalStrategy;
+use wupdedup::config::LocalConfig;
+use wupdedup::storage::local::LocalStrategy;
 
 // Property: Hash function is deterministic
 proptest! {
@@ -65,7 +65,7 @@ proptest! {
         let temp_dir = tempdir().unwrap();
         let db_path = temp_dir.path().join("test.db");
 
-        let db = wupdedup_rs::db::DB::init(db_path.to_str().unwrap()).unwrap();
+        let db = wupdedup::db::DB::init(db_path.to_str().unwrap()).unwrap();
         let bucket = db.bucket("test").unwrap();
 
         let mut expected = HashMap::new();
@@ -126,7 +126,7 @@ proptest! {
 
         let temp_dir = tempdir().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let db = Arc::new(wupdedup_rs::db::DB::init(db_path.to_str().unwrap()).unwrap());
+        let db = Arc::new(wupdedup::db::DB::init(db_path.to_str().unwrap()).unwrap());
 
         let mut handles = vec![];
 
@@ -198,7 +198,7 @@ proptest! {
         std::fs::write(&file_path, &content).unwrap();
 
         // Should never panic
-        let mime_type = wupdedup_rs::content::get_type(&file_path).unwrap();
+        let mime_type = wupdedup::content::get_type(&file_path).unwrap();
 
         // Should always return a valid MIME type
         prop_assert!(!mime_type.is_empty());
@@ -211,7 +211,7 @@ proptest! {
 #[ignore] // This test is slow and async, run with --ignored flag
 fn prop_scan_reproducible() {
     use std::sync::Arc;
-    use wupdedup_rs::storage::StorageStrategyContext;
+    use wupdedup::storage::StorageStrategyContext;
 
     // Note: This is a simplified version that doesn't use proptest due to async complexity
     // For production, consider using proptest-tokio or similar
@@ -228,7 +228,7 @@ fn prop_scan_reproducible() {
 
         // First scan
         let db_path1 = temp_dir.path().join("db1.db");
-        let db1 = wupdedup_rs::db::DB::init(db_path1.to_str().unwrap()).unwrap();
+        let db1 = wupdedup::db::DB::init(db_path1.to_str().unwrap()).unwrap();
         let bucket1 = db1.bucket("test").unwrap();
 
         let config = LocalConfig {
@@ -242,7 +242,7 @@ fn prop_scan_reproducible() {
 
         // Second scan
         let db_path2 = temp_dir.path().join("db2.db");
-        let db2 = wupdedup_rs::db::DB::init(db_path2.to_str().unwrap()).unwrap();
+        let db2 = wupdedup::db::DB::init(db_path2.to_str().unwrap()).unwrap();
         let bucket2 = db2.bucket("test").unwrap();
 
         let strategy2 = Arc::new(LocalStrategy::new(config));
@@ -308,7 +308,7 @@ proptest! {
 
         let temp_dir = tempdir().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let db = wupdedup_rs::db::DB::init(db_path.to_str().unwrap()).unwrap();
+        let db = wupdedup::db::DB::init(db_path.to_str().unwrap()).unwrap();
         let bucket = db.bucket("test").unwrap();
 
         let mut expected_keys = HashSet::new();
