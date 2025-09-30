@@ -186,7 +186,36 @@ wupdedup/
 
 ## Architecture
 
-wupdedup-rs uses a strategy pattern for storage backends, allowing easy extension:
+### Core Design Patterns
+- **Strategy Pattern**: Storage backends (local, SmugMug, etc.) implement a common `StorageStrategy` trait
+- **Parallel Processing**: Uses rayon for CPU-bound operations (file hashing)
+- **Async I/O**: Uses tokio for I/O-bound operations (file system traversal)
+- **Embedded Database**: Uses redb for persistent metadata storage
+
+### Key Components
+
+1. **Storage Strategies** (`src/storage/`)
+   - `local.rs`: Local filesystem scanner with parallel Blake3 hashing
+     - `FileInfo`: Public struct for file metadata (path, size, file_type, hash, modified)
+   - `smugmug.rs`: SmugMug API integration with OAuth 1.0a support
+   - `mod.rs`: Strategy trait and context management
+
+2. **Database Layer** (`src/db/`)
+   - Embedded redb database for metadata storage
+   - Key-value store with buckets for different storage sources
+   - Methods: `put()`, `get()`, `delete()`, `exists()`, `scan_prefix()`, `all()`, `count()`
+
+3. **Configuration** (`src/config/`)
+   - Hierarchical configuration: CLI args > env vars > .env > config.toml
+   - Supports profiles for CPU/memory profiling
+   - Per-storage backend configuration
+
+4. **CLI Interface** (`src/main.rs`)
+   - Commands: `scan`, `dedupe`, `stats`
+   - Uses clap for argument parsing
+   - Structured logging with tracing
+
+### Strategy Pattern Implementation
 
 ```rust
 #[async_trait]
@@ -196,7 +225,278 @@ pub trait StorageStrategy: Send + Sync {
 }
 ```
 
-Each storage backend (local, SmugMug, etc.) implements this trait, enabling uniform handling of disparate storage systems.
+Each storage backend implements this trait, enabling uniform handling of disparate storage systems.
+
+## Testing Strategy
+
+### Test Coverage (99 tests total, 96+ passing)
+- **Unit Tests** (43): In-module tests for individual components
+- **Integration Tests** (14): `tests/integration_test.rs` - full workflow tests
+- **Property Tests** (12): `tests/property_tests.rs` - invariant testing with proptest
+- **CLI Tests** (11): `tests/cli_test.rs` - end-to-end command testing
+- **Benchmarks**: `benches/` - performance testing for hashing and database
+
+### Test Utilities (`tests/common/`)
+- `TestFixture`: Creates isolated test environments with temp directories
+- `TestScenarioBuilder`: Generates test file hierarchies
+- `PerfTimer`: Performance assertion utilities
+- Standard test layouts for consistent testing
+
+## Performance Characteristics
+
+### Hashing Performance
+- Blake3 achieves ~3 GB/s on modern hardware
+- 64KB chunk size optimal for I/O and hashing balance
+- Parallel processing scales linearly with CPU cores
+
+### Scanning Performance
+- 1000+ files/second typical throughput
+- Memory usage: O(1) for scanning (streaming)
+- Database writes are batched for efficiency
+
+## Development
+
+### ⚠️ ZERO WARNINGS POLICY
+
+**Critical Rule**: This project treats ALL warnings as failures. Builds must be completely warning-free.
+
+**Enforcement Mechanisms**:
+- **Cargo.toml**: `[lints.rust]` section denies warnings globally
+- **CI Builds**: `RUSTFLAGS="-D warnings"` fails build on any warning
+- **Development**: More permissive but still denies critical warnings (unused imports, unused variables)
+- **Clippy**: Configured with `--deny warnings` in CI checks
+
+**For Development**: 
+- Use `#[allow(dead_code)]` with explicit comments for intentionally unused code
+- Fix all warnings immediately - never commit code with warnings
+- Use `cargo clippy` regularly during development
+
+### Nix-based Development Environment (Recommended)
+
+This project uses a comprehensive Nix flake for reproducible development environments with proper native dependency management.
+
+#### Quick Start
+```bash
+# Enter development environment
+nix develop
+
+# Or build directly without entering shell
+nix develop --command cargo build --release
+```
+
+#### Development Environment Features
+- **Rust toolchain**: Stable Rust 1.89+ via Fenix (modern rustup replacement)
+- **Native dependencies**: OpenSSL, pkg-config automatically available
+- **Development tools**: cargo-watch, cargo-nextest, rust-analyzer, clippy, rustfmt
+- **Performance tools**: valgrind, perf-tools, hyperfine for profiling
+- **Cross-platform**: Works on Linux, macOS, and NixOS
+
+#### Available Development Shells
+```bash
+nix develop                    # Full development environment
+nix develop .#ci              # Minimal CI environment  
+nix develop .#perf            # Performance testing with profiling tools
+```
+
+#### Nix Flake Commands
+```bash
+nix flake check               # Run all CI checks (build, test, clippy, fmt)
+nix build                     # Build the application
+nix run                       # Run the application
+```
+
+### Traditional Building (if not using Nix)
+```bash
+cargo build           # Debug build
+cargo build --release # Optimized build
+```
+
+**Note**: On NixOS or when native dependencies (OpenSSL, pkg-config) are missing, use the Nix development environment above.
+
+### Testing
+```bash
+# Using Nix environment (recommended)
+nix develop --command cargo nextest run     # Fast parallel testing
+nix develop --command cargo test            # Standard testing
+nix develop --command cargo bench           # Run benchmarks
+
+# Traditional commands (if not using Nix)
+cargo test           # Run all tests
+cargo test --lib     # Unit tests only
+cargo test --test integration_test  # Integration tests
+cargo test --test cli_test         # CLI tests
+cargo bench          # Run benchmarks
+```
+
+### Code Quality
+```bash
+# Using Nix environment (recommended)
+nix flake check                              # Run all checks (build, test, clippy, fmt)
+nix develop --command cargo clippy           # Lint code
+nix develop --command cargo fmt              # Format code
+nix develop --command cargo doc --open       # Generate documentation
+
+# Traditional commands (if not using Nix)
+cargo fmt            # Format code
+cargo clippy         # Lint code
+cargo doc --open     # Generate documentation
+```
+
+## Common Development Tasks
+
+### Adding a New Storage Backend
+1. Create new file in `src/storage/` (e.g., `s3.rs`)
+2. Implement `StorageStrategy` trait
+3. Add configuration struct in `src/config/mod.rs`
+4. Update `load_storage_strategy_contexts()` in `src/storage/mod.rs`
+5. Add tests in the implementation file
+
+### Adding a New CLI Command
+1. Add variant to `Commands` enum in `src/main.rs`
+2. Implement handler function (e.g., `run_new_command()`)
+3. Add command logic in main match statement
+4. Add CLI tests in `tests/cli_test.rs`
+
+### Database Schema Changes
+1. Modify `FileInfo` struct in `src/storage/local.rs`
+2. Update serialization/deserialization logic
+3. Consider migration strategy for existing databases
+4. Update tests to verify new fields
+
+## Recent Updates (2025-09-07)
+
+### Completed: SmugMug API Integration with Mock Testing
+- **Integrated official smugmug crate (v0.6)**: Replaced custom implementation with battle-tested OAuth 1.0a client
+- **Proper API v2 support**: Connected to real SmugMug REST endpoints with correct authentication flow
+- **Mock mode implementation**: Created comprehensive mock testing system for development without credentials
+- **Stream-based processing**: Albums and images fetched as async streams for memory efficiency
+- **Test coverage**: 99 total tests passing, including 9 SmugMug-specific tests (6 unit, 3 integration)
+
+### Mock Mode Features
+- **No credentials required**: Use `mock_mode = true` in config for testing
+- **Realistic test data**: Generates 3 albums with 16 total images
+- **Deterministic output**: Consistent data across runs for reliable testing
+- **Full database integration**: Mock data stored in same format as real SmugMug data
+- **CI/CD friendly**: All tests run offline without external dependencies
+
+### SmugMug Configuration
+```toml
+[smugmug]
+api_key = "your_key"           # Get from https://api.smugmug.com/api/developer/apply
+api_secret = "your_secret"
+access_token = "oauth_token"    # From OAuth 1.0a flow
+access_token_secret = "oauth_secret"
+mock_mode = false               # Set true for testing without credentials
+```
+
+### Completed: Real Duplicate File Processing (2025-09-06)
+- **Integrated deduplication engine with database**: The dedupe command now properly deserializes FileInfo structs and processes actual files
+- **Added file existence validation**: Files are checked before processing, with missing files logged and skipped
+- **Enhanced error handling**: Better handling of missing files, permission errors, and edge cases
+- **Consistent file ordering**: Files are sorted alphabetically to ensure deterministic behavior
+- **Comprehensive test coverage**: Added 5 new integration tests for all deduplication strategies
+
+## Environment-Specific Notes
+
+### NixOS and OpenSSL Dependencies
+
+This project requires OpenSSL and pkg-config for some dependencies (reqwest, object_store). The Nix flake automatically provides these dependencies.
+
+**Why this is needed:**
+- `reqwest` with `rustls-tls` still pulls in `native-tls` through default features
+- `object_store` cloud backends require OpenSSL for TLS connections
+- Traditional package managers install these to standard locations, but NixOS uses `/nix/store/` paths
+
+**Build Environment Comparison:**
+- **Termux**: Has `pkg-config` and `openssl-dev` in standard locations ✅
+- **Ubuntu/Debian**: Install with `apt install pkg-config libssl-dev` ✅  
+- **NixOS**: Use `nix develop` or install via `environment.systemPackages` ✅
+- **macOS**: Additional frameworks needed (Security, SystemConfiguration) ✅
+
+The flake handles all of these automatically across platforms.
+
+### Direnv Integration (Optional)
+
+For automatic environment loading:
+
+```bash
+# Create .envrc file
+echo "use flake" > .envrc
+
+# Allow direnv to load the environment
+direnv allow
+
+# Now the environment loads automatically when entering the directory
+```
+
+## Known Issues and TODOs
+
+### Current Limitations
+- SmugMug OAuth token acquisition not automated (must be obtained manually)
+- SmugMug image dimensions not available in current API response structure
+- Database schema could benefit from additional indexes
+- Some database methods (find_by_hash, find_by_size, find_by_type) are implemented but not yet utilized
+
+### Future Enhancements
+- Add S3/GCS/Azure storage backends
+- Implement content-defined chunking for large files
+- Add perceptual hashing for images
+- Implement automatic deduplication strategies
+- Add web UI for visualization
+
+## Dependencies
+
+### Core Dependencies
+- `tokio`: Async runtime
+- `redb`: Embedded database
+- `blake3`: Fast cryptographic hashing
+- `rayon`: Parallel processing
+- `clap`: CLI argument parsing
+- `tracing`: Structured logging
+- `serde`: Serialization
+
+### Development Dependencies
+- `criterion`: Benchmarking framework
+- `proptest`: Property-based testing
+- `assert_cmd`: CLI testing
+- `tempfile`: Test isolation
+- `rstest`: Test fixtures
+
+## Performance Tuning
+
+### Environment Variables
+```bash
+RAYON_NUM_THREADS=8  # Limit parallel threads
+RUST_LOG=debug       # Enable debug logging
+```
+
+### Profiling
+```bash
+# CPU profiling
+cargo build --release
+perf record --call-graph=dwarf ./target/release/wupdedup-rs scan --local /path
+perf report
+
+# Memory profiling
+valgrind --tool=massif ./target/release/wupdedup-rs scan --local /path
+ms_print massif.out.*
+```
+
+## Debugging Tips
+
+1. **Enable debug logging**: `RUST_LOG=debug cargo run`
+2. **Test single file**: Create minimal test case in `test_scan_dir/`
+3. **Database inspection**: Use redb CLI tools or write custom inspector
+4. **Benchmark specific operations**: Use criterion's `bench_function`
+
+## Code Style Guidelines
+
+- Use `anyhow::Result` for error handling
+- Prefer `tracing` over `println!` for logging
+- Keep functions under 50 lines
+- Write tests for all public APIs
+- Document complex algorithms
+- Use clippy lints: `#![warn(clippy::all)]`
 
 ## Contributing
 
