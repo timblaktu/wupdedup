@@ -1,8 +1,8 @@
-# wupdedup-rs Architecture Documentation
+# wupdedup Architecture Documentation
 
 ## System Overview
 
-wupdedup-rs is a multicloud storage management and deduplication system designed to analyze and organize digital content scattered across various storage providers. The system employs a modular architecture using the Strategy Pattern to abstract storage providers and enable extensible support for new storage backends.
+wupdedup is a multicloud storage management and deduplication system designed to analyze and organize digital content scattered across various storage providers. The system employs a modular architecture using the Strategy Pattern to abstract storage providers and enable extensible support for new storage backends.
 
 ## Core Design Principles
 
@@ -313,4 +313,4 @@ pub fn operation() -> Result<Data> {
 
 ## Conclusion
 
-The wupdedup-rs architecture provides a solid foundation for multicloud storage management with clear separation of concerns, extensible design patterns, and performance-oriented implementation. The use of Rust ensures memory safety and performance while the modular design allows for easy extension and maintenance.
+The wupdedup architecture provides a solid foundation for multicloud storage management with clear separation of concerns, extensible design patterns, and performance-oriented implementation. The use of Rust ensures memory safety and performance while the modular design allows for easy extension and maintenance.

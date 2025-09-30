@@ -13,7 +13,7 @@ use storage::local::FileInfo;
 use tracing::{debug, error, info, warn};
 
 #[derive(Parser, Debug)]
-#[command(name = "wupdedup-rs")]
+#[command(name = "wupdedup")]
 #[command(author = "Tim Blaktu")]
 #[command(version = "0.1.0")]
 #[command(about = "A modular multicloud storage management and deduplication tool", long_about = None)]
@@ -90,7 +90,7 @@ async fn main() -> Result<()> {
 
     // Initialize logging
     logging::init(&cli.log_level)?;
-    debug!("Starting wupdedup-rs");
+    debug!("Starting wupdedup");
 
     // Load configuration
     let mut config = config::Config::load()?;
@@ -136,7 +136,7 @@ async fn main() -> Result<()> {
         run_scan(&config).await?;
     }
 
-    debug!("wupdedup-rs exiting");
+    debug!("wupdedup exiting");
     Ok(())
 }
 

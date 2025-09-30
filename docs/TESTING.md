@@ -2,7 +2,7 @@
 
 ## Overview
 
-The wupdedup-rs project has a comprehensive test suite following Rust best practices for Test-Driven Development (TDD). The test infrastructure supports parallel execution, property-based testing, performance benchmarking, and code coverage reporting.
+The wupdedup project has a comprehensive test suite following Rust best practices for Test-Driven Development (TDD). The test infrastructure supports parallel execution, property-based testing, performance benchmarking, and code coverage reporting.
 
 ## Test Structure
 

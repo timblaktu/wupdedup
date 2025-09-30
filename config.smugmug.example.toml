@@ -1,4 +1,4 @@
-# Example SmugMug configuration for wupdedup-rs
+# Example SmugMug configuration for wupdedup
 
 # Basic configuration
 log_level = "info"

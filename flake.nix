@@ -1,5 +1,5 @@
 {
-  description = "wupdedup-rs - A high-performance file deduplication and multicloud storage management tool";
+  description = "wupdedup - A high-performance file deduplication and multicloud storage management tool";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -66,9 +66,9 @@
         });
 
         # Build the main application
-        wupdedup-rs = craneLib.buildPackage (commonArgs // {
+        wupdedup = craneLib.buildPackage (commonArgs // {
           inherit cargoArtifacts;
-          pname = "wupdedup-rs";
+          pname = "wupdedup";
           version = "0.1.0";
           
           # Set the nix shell name for proper prompt detection
@@ -111,14 +111,14 @@
       in
       {
         packages = {
-          default = wupdedup-rs;
-          wupdedup-rs = wupdedup-rs;
+          default = wupdedup;
+          wupdedup = wupdedup;
         };
 
         # All checks that run in CI
         checks = {
           inherit 
-            wupdedup-rs 
+            wupdedup 
             wupdedup-clippy 
             wupdedup-doc 
             wupdedup-nextest 
@@ -128,7 +128,7 @@
         # Comprehensive development shell
         devShells.default = craneLib.devShell {
           # Inherit all build inputs from the package
-          inputsFrom = [ wupdedup-rs ];
+          inputsFrom = [ wupdedup ];
           
           # Set shell name for prompt detection
           name = "wupdedup";
@@ -170,7 +170,7 @@
             export name="wupdedup"
             export NIX_SHELL_NAME="wupdedup"
             
-            echo "🔨 Entering wupdedup-rs development environment"
+            echo "🔨 Entering wupdedup development environment"
             echo "📦 Rust toolchain: $(rustc --version)"
             echo "🔗 OpenSSL: ${pkgs.openssl.version}"
             echo "🛠️  Available tools: cargo-watch, cargo-nextest, rust-analyzer, and more"
@@ -207,7 +207,7 @@
 
         # Minimal shell for CI environments
         devShells.ci = craneLib.devShell {
-          inputsFrom = [ wupdedup-rs ];
+          inputsFrom = [ wupdedup ];
           name = "wupdedup-ci";
           packages = with pkgs; [
             cargo-nextest
@@ -217,7 +217,7 @@
 
         # Performance testing shell with additional profiling tools
         devShells.perf = craneLib.devShell {
-          inputsFrom = [ wupdedup-rs ];
+          inputsFrom = [ wupdedup ];
           name = "wupdedup-perf";
           packages = with pkgs; [
             cargo-nextest

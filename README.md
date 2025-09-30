@@ -1,4 +1,4 @@
-# wupdedup-rs
+# wupdedup
 
 A high-performance file deduplication and multicloud storage management tool written in Rust.
 
@@ -21,7 +21,7 @@ cd wupdedup
 # Build the release version
 cargo build --release
 
-# The binary will be at target/release/wupdedup-rs
+# The binary will be at target/release/wupdedup
 ```
 
 ## Usage
@@ -30,50 +30,50 @@ cargo build --release
 
 ```bash
 # Scan a directory
-wupdedup-rs scan --local /path/to/directory
+wupdedup scan --local /path/to/directory
 
 # Scan with custom database location
-wupdedup-rs --db-file custom.db scan --local /path/to/directory
+wupdedup --db-file custom.db scan --local /path/to/directory
 
 # Scan with debug logging
-wupdedup-rs --log-level debug scan --local /path/to/directory
+wupdedup --log-level debug scan --local /path/to/directory
 ```
 
 ### Find and process duplicates
 
 ```bash
 # Show duplicate files without taking action
-wupdedup-rs dedupe --show-only
+wupdedup dedupe --show-only
 
 # Delete duplicates (keeps first file alphabetically)
-wupdedup-rs dedupe --strategy delete --auto
+wupdedup dedupe --strategy delete --auto
 
 # Move duplicates to a directory
-wupdedup-rs dedupe --strategy move --target-dir /path/to/duplicates --auto
+wupdedup dedupe --strategy move --target-dir /path/to/duplicates --auto
 
 # Archive duplicates (preserves directory structure)
-wupdedup-rs dedupe --strategy archive --target-dir /path/to/archive --auto
+wupdedup dedupe --strategy archive --target-dir /path/to/archive --auto
 
 # Create symlinks to original (Unix only)
-wupdedup-rs dedupe --strategy symlink --auto
+wupdedup dedupe --strategy symlink --auto
 
 # Dry run - preview changes without applying them
-wupdedup-rs dedupe --strategy delete --dry-run --auto
+wupdedup dedupe --strategy delete --dry-run --auto
 
 # Interactive mode (prompts for each duplicate)
-wupdedup-rs dedupe --strategy delete
+wupdedup dedupe --strategy delete
 ```
 
 ### View statistics
 
 ```bash
 # Show indexed file counts
-wupdedup-rs stats
+wupdedup stats
 ```
 
 ## Configuration
 
-wupdedup-rs can be configured through:
+wupdedup can be configured through:
 
 1. **Command-line arguments** (highest priority)
 2. **Environment variables** (prefix with `WUPDEDUP_`)
@@ -120,7 +120,7 @@ force_metadata_times = false
 
 ## Performance
 
-wupdedup-rs is optimized for performance:
+wupdedup is optimized for performance:
 
 - **Blake3 hashing**: Extremely fast cryptographic hashing
 - **Parallel processing**: Uses all available CPU cores via rayon
@@ -474,11 +474,11 @@ RUST_LOG=debug       # Enable debug logging
 ```bash
 # CPU profiling
 cargo build --release
-perf record --call-graph=dwarf ./target/release/wupdedup-rs scan --local /path
+perf record --call-graph=dwarf ./target/release/wupdedup scan --local /path
 perf report
 
 # Memory profiling
-valgrind --tool=massif ./target/release/wupdedup-rs scan --local /path
+valgrind --tool=massif ./target/release/wupdedup scan --local /path
 ms_print massif.out.*
 ```
 

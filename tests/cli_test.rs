@@ -6,7 +6,7 @@ use tempfile::TempDir;
 
 #[test]
 fn test_cli_help() -> Result<()> {
-    let mut cmd = Command::cargo_bin("wupdedup-rs")?;
+    let mut cmd = Command::cargo_bin("wupdedup")?;
     cmd.arg("--help")
         .assert()
         .success()
@@ -23,11 +23,11 @@ fn test_cli_help() -> Result<()> {
 
 #[test]
 fn test_cli_version() -> Result<()> {
-    let mut cmd = Command::cargo_bin("wupdedup-rs")?;
+    let mut cmd = Command::cargo_bin("wupdedup")?;
     cmd.arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("wupdedup-rs"));
+        .stdout(predicate::str::contains("wupdedup"));
 
     Ok(())
 }
@@ -45,7 +45,7 @@ fn test_scan_command() -> Result<()> {
     // Create a test database
     let db_file = temp_dir.path().join("test.db");
 
-    let mut cmd = Command::cargo_bin("wupdedup-rs")?;
+    let mut cmd = Command::cargo_bin("wupdedup")?;
     cmd.arg("--db-file")
         .arg(db_file.to_str().unwrap())
         .arg("scan")
@@ -64,7 +64,7 @@ fn test_scan_empty_directory() -> Result<()> {
     // Create a test database
     let db_file = temp_dir.path().join("test.db");
 
-    let mut cmd = Command::cargo_bin("wupdedup-rs")?;
+    let mut cmd = Command::cargo_bin("wupdedup")?;
     cmd.arg("--db-file")
         .arg(db_file.to_str().unwrap())
         .arg("scan")
@@ -91,7 +91,7 @@ fn test_dedupe_command() -> Result<()> {
     let db_file = temp_dir.path().join("test.db");
 
     // First scan the files
-    let mut scan_cmd = Command::cargo_bin("wupdedup-rs")?;
+    let mut scan_cmd = Command::cargo_bin("wupdedup")?;
     scan_cmd
         .arg("--db-file")
         .arg(db_file.to_str().unwrap())
@@ -102,7 +102,7 @@ fn test_dedupe_command() -> Result<()> {
         .success();
 
     // Then run dedupe
-    let mut dedupe_cmd = Command::cargo_bin("wupdedup-rs")?;
+    let mut dedupe_cmd = Command::cargo_bin("wupdedup")?;
     dedupe_cmd
         .arg("--db-file")
         .arg(db_file.to_str().unwrap())
@@ -130,7 +130,7 @@ fn test_stats_command() -> Result<()> {
     let db_file = temp_dir.path().join("test.db");
 
     // First scan the files
-    let mut scan_cmd = Command::cargo_bin("wupdedup-rs")?;
+    let mut scan_cmd = Command::cargo_bin("wupdedup")?;
     scan_cmd
         .arg("--db-file")
         .arg(db_file.to_str().unwrap())
@@ -141,7 +141,7 @@ fn test_stats_command() -> Result<()> {
         .success();
 
     // Then check stats
-    let mut stats_cmd = Command::cargo_bin("wupdedup-rs")?;
+    let mut stats_cmd = Command::cargo_bin("wupdedup")?;
     stats_cmd
         .arg("--db-file")
         .arg(db_file.to_str().unwrap())
@@ -167,7 +167,7 @@ fn test_scan_with_subdirectories() -> Result<()> {
     // Create a test database
     let db_file = temp_dir.path().join("test.db");
 
-    let mut cmd = Command::cargo_bin("wupdedup-rs")?;
+    let mut cmd = Command::cargo_bin("wupdedup")?;
     cmd.arg("--db-file")
         .arg(db_file.to_str().unwrap())
         .arg("scan")
@@ -191,7 +191,7 @@ fn test_multiple_scans_are_idempotent() -> Result<()> {
     let db_file = temp_dir.path().join("test.db");
 
     // First scan
-    let mut scan1 = Command::cargo_bin("wupdedup-rs")?;
+    let mut scan1 = Command::cargo_bin("wupdedup")?;
     scan1
         .arg("--db-file")
         .arg(db_file.to_str().unwrap())
@@ -202,7 +202,7 @@ fn test_multiple_scans_are_idempotent() -> Result<()> {
         .success();
 
     // Second scan (should update, not duplicate)
-    let mut scan2 = Command::cargo_bin("wupdedup-rs")?;
+    let mut scan2 = Command::cargo_bin("wupdedup")?;
     scan2
         .arg("--db-file")
         .arg(db_file.to_str().unwrap())
@@ -213,7 +213,7 @@ fn test_multiple_scans_are_idempotent() -> Result<()> {
         .success();
 
     // Check stats - should still be 2 files
-    let mut stats = Command::cargo_bin("wupdedup-rs")?;
+    let mut stats = Command::cargo_bin("wupdedup")?;
     stats
         .arg("--db-file")
         .arg(db_file.to_str().unwrap())
@@ -232,7 +232,7 @@ fn test_log_level_argument() -> Result<()> {
     // Create a test database
     let db_file = temp_dir.path().join("test.db");
 
-    let mut cmd = Command::cargo_bin("wupdedup-rs")?;
+    let mut cmd = Command::cargo_bin("wupdedup")?;
     cmd.arg("--db-file")
         .arg(db_file.to_str().unwrap())
         .arg("--log-level")
@@ -248,7 +248,7 @@ fn test_log_level_argument() -> Result<()> {
 
 #[test]
 fn test_invalid_directory_error() -> Result<()> {
-    let mut cmd = Command::cargo_bin("wupdedup-rs")?;
+    let mut cmd = Command::cargo_bin("wupdedup")?;
     cmd.arg("scan")
         .arg("--local")
         .arg("/nonexistent/directory/path")
@@ -274,7 +274,7 @@ fn test_dedupe_finds_identical_files() -> Result<()> {
     let db_file = temp_dir.path().join("test.db");
 
     // Scan
-    let mut scan = Command::cargo_bin("wupdedup-rs")?;
+    let mut scan = Command::cargo_bin("wupdedup")?;
     scan.arg("--db-file")
         .arg(db_file.to_str().unwrap())
         .arg("scan")
@@ -284,7 +284,7 @@ fn test_dedupe_finds_identical_files() -> Result<()> {
         .success();
 
     // Check dedupe finds all three
-    let mut dedupe = Command::cargo_bin("wupdedup-rs")?;
+    let mut dedupe = Command::cargo_bin("wupdedup")?;
     dedupe
         .arg("--db-file")
         .arg(db_file.to_str().unwrap())
@@ -319,7 +319,7 @@ fn test_dedupe_delete_strategy() -> Result<()> {
     let db_file = temp_dir.path().join("test.db");
 
     // Scan
-    let mut scan = Command::cargo_bin("wupdedup-rs")?;
+    let mut scan = Command::cargo_bin("wupdedup")?;
     scan.arg("--db-file")
         .arg(db_file.to_str().unwrap())
         .arg("scan")
@@ -329,7 +329,7 @@ fn test_dedupe_delete_strategy() -> Result<()> {
         .success();
 
     // Dedupe with delete strategy (dry run first)
-    let mut dedupe_dry = Command::cargo_bin("wupdedup-rs")?;
+    let mut dedupe_dry = Command::cargo_bin("wupdedup")?;
     dedupe_dry
         .arg("--db-file")
         .arg(db_file.to_str().unwrap())
@@ -348,7 +348,7 @@ fn test_dedupe_delete_strategy() -> Result<()> {
     assert!(file3.exists());
 
     // Dedupe with delete strategy (actual)
-    let mut dedupe = Command::cargo_bin("wupdedup-rs")?;
+    let mut dedupe = Command::cargo_bin("wupdedup")?;
     dedupe
         .arg("--db-file")
         .arg(db_file.to_str().unwrap())
@@ -386,7 +386,7 @@ fn test_dedupe_move_strategy() -> Result<()> {
     let db_file = temp_dir.path().join("test.db");
 
     // Scan
-    let mut scan = Command::cargo_bin("wupdedup-rs")?;
+    let mut scan = Command::cargo_bin("wupdedup")?;
     scan.arg("--db-file")
         .arg(db_file.to_str().unwrap())
         .arg("scan")
@@ -396,7 +396,7 @@ fn test_dedupe_move_strategy() -> Result<()> {
         .success();
 
     // Dedupe with move strategy
-    let mut dedupe = Command::cargo_bin("wupdedup-rs")?;
+    let mut dedupe = Command::cargo_bin("wupdedup")?;
     dedupe
         .arg("--db-file")
         .arg(db_file.to_str().unwrap())
@@ -444,7 +444,7 @@ fn test_dedupe_archive_strategy() -> Result<()> {
     let db_file = temp_dir.path().join("test.db");
 
     // Scan
-    let mut scan = Command::cargo_bin("wupdedup-rs")?;
+    let mut scan = Command::cargo_bin("wupdedup")?;
     scan.arg("--db-file")
         .arg(db_file.to_str().unwrap())
         .arg("scan")
@@ -454,7 +454,7 @@ fn test_dedupe_archive_strategy() -> Result<()> {
         .success();
 
     // Dedupe with archive strategy
-    let mut dedupe = Command::cargo_bin("wupdedup-rs")?;
+    let mut dedupe = Command::cargo_bin("wupdedup")?;
     dedupe
         .arg("--db-file")
         .arg(db_file.to_str().unwrap())
@@ -491,7 +491,7 @@ fn test_dedupe_no_duplicates() -> Result<()> {
     let db_file = temp_dir.path().join("test.db");
 
     // Scan
-    let mut scan = Command::cargo_bin("wupdedup-rs")?;
+    let mut scan = Command::cargo_bin("wupdedup")?;
     scan.arg("--db-file")
         .arg(db_file.to_str().unwrap())
         .arg("scan")
@@ -501,7 +501,7 @@ fn test_dedupe_no_duplicates() -> Result<()> {
         .success();
 
     // Check dedupe finds no duplicates
-    let mut dedupe = Command::cargo_bin("wupdedup-rs")?;
+    let mut dedupe = Command::cargo_bin("wupdedup")?;
     dedupe
         .arg("--db-file")
         .arg(db_file.to_str().unwrap())
